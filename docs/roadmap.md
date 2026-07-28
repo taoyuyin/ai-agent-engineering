@@ -2,108 +2,537 @@
 
 Version: 2026-07
 
-Last Updated: 2026-07-27
+Last Updated: 2026-07-28
 
 ## 项目愿景
 
-`AI Agent Engineering` 希望形成一个长期演进的开源知识体系：
+`AI Agent Engineering` 是一本持续更新的企业级 AI Agent 工程教材，也是一套配套源码工程。
 
-- 一本企业级 AI Agent 工程教材
-- 一个可运行、可演进的 Agent Runtime 源码仓库
-- 一组真实业务场景下的 Agent 案例
-- 一套面向生产环境的评测、部署、安全与治理方法
+它的目标不是介绍某一个框架的 API，而是建立一套完整的 Agent 工程知识体系：
 
-## 第一阶段：教材与源码一体化
+- 理解 Agent 为什么出现
+- 理解 LLM 为什么让 Agent 成为可能
+- 理解 Agent 内部如何工作
+- 掌握企业级 Agent 的工程实现方法
+- 分析主流 Agent 框架的设计思想
+- 落地真实企业场景
+- 思考下一代软件形态
 
-目标：完成基础目录、写作规范、章节结构和最小 Agent 示例。
+本项目坚持：
 
-重点内容：
+```text
+Agent Runtime
+  ↓
+OpenAI Agents SDK / LangGraph / Google ADK / CrewAI / AutoGen / Dify
+```
 
-- Chapter 01：软件为什么需要 AI Agent
-- Chapter 02：AI Agent 的工程定义
-- Chapter 03：最小 Agent Runtime
-- Chapter 04：Tools 与外部系统
-- Chapter 05：Memory 与 Context
-- Chapter 06：Planner 与任务分解
+先理解并实现 Agent Runtime，再学习成熟框架为什么这样设计。
 
-## 第二阶段：自研 Agent Runtime
+## 全书结构
 
-目标：实现一个教学版但结构完整的 Agent Runtime。
+```text
+Part I    Foundations          为什么需要 AI Agent
+Part II   LLM Foundations      Agent 为什么能够工作
+Part III  Agent Architecture   Agent 内部如何工作
+Part IV   Agent Engineering    如何构建企业级 Agent
+Part V    Frameworks           主流 Agent 框架设计
+Part VI   Enterprise Practice  企业实践
+Part VII  Future               下一代软件
+```
 
-核心模块：
+## Part I Foundations —— 为什么需要 AI Agent
 
-- `framework/runtime`
-- `framework/planner`
-- `framework/memory`
-- `framework/tools`
-- `framework/workflow`
-- `framework/executor`
+目标：建立世界观，理解 Agent 出现的历史背景。
 
-设计原则：
+这一部分不涉及任何框架。
 
-- 简单优先
-- 可阅读优先
-- 每个抽象都能对应文章解释
-- 后续案例必须复用同一 Runtime
+### Chapter 1 软件为什么需要 AI Agent？
 
-## 第三阶段：完整 Agent 案例
+核心问题：为什么今天会出现 Agent？
 
-目标：把 Runtime 应用到多个完整案例。
+主要内容：
 
-计划案例：
+- 软件复杂度的持续增长
+- 从“执行流程”到“完成目标”
+- LLM 带来的变化
+- Agent 出现的必然性
 
-- SQL Agent
-- Data Agent
-- Coding Agent
-- RAG Agent
+输出：Agent 是软件执行范式的变化。
+
+### Chapter 2 软件架构为什么不断演进？
+
+主要内容：
+
+```text
+MVC
+  ↓
+SOA
+  ↓
+Microservice
+  ↓
+Cloud Native
+  ↓
+AI Agent
+```
+
+每一次架构演进都要回答：它解决了什么问题？
+
+最后建立完整的软件技术栈视角。
+
+输出：Agent 是 Intelligence Layer。
+
+### Chapter 3 什么是真正的 AI Agent？
+
+第一次正式定义 Agent。
+
+讨论不同厂商和社区定义：
+
+- OpenAI
+- Anthropic
+- Google
+
+Agent 的五个组成：
+
+- Goal
+- Planning
+- Tool
+- Memory
+- Feedback
+
+输出：Agent 的统一定义。
+
+### Chapter 4 Agent 与 Workflow 的区别
+
+回答：
+
+- 为什么 Workflow 不是 Agent
+- 为什么 Agent 不等于 Workflow
+- 什么时候需要 Workflow
+- 什么时候需要 Agent
+- 什么时候组合使用
+
+输出：Agent 与 Workflow 的边界。
+
+## Part II LLM Foundations —— Agent 为什么能够工作
+
+目标：理解 LLM，而不是训练 LLM。
+
+这一部分建立 Agent 的理论基础。
+
+### Chapter 5 Transformer
+
+主要内容：
+
+- 为什么需要 Attention
+- 为什么 Transformer 出现
+- Transformer 对 LLM 的意义
+
+### Chapter 6 Token
+
+主要内容：
+
+- Tokenizer
+- BPE
+- 为什么 Token 不是字符
+- Token 对成本、上下文和输出控制的影响
+
+### Chapter 7 Embedding
+
+主要内容：
+
+- 为什么向量可以表达语义
+- Embedding 空间
+- 相似度
+- Embedding 在 Agent 和 RAG 中的位置
+
+### Chapter 8 Context
+
+主要内容：
+
+- Context Window
+- KV Cache
+- 为什么模型会“遗忘”
+- 上下文管理对 Agent 的意义
+
+### Chapter 9 Reasoning
+
+主要内容：
+
+- Chain-of-Thought
+- ReAct
+- Tree of Thoughts
+- Reflection
+- Reasoning Model
+
+### Chapter 10 Function Calling
+
+主要内容：
+
+- 为什么模型可以调用 Tool
+- Structured Output
+- JSON Schema
+- Function Calling 与 Tool Calling 的工程意义
+
+### Chapter 11 MCP
+
+主要内容：
+
+- 为什么需要 MCP
+- MCP 的定位
+- 协议设计
+- 未来生态
+
+## Part III Agent Architecture —— Agent 内部如何工作
+
+目标：理解 Agent 的内部结构。
+
+这是全书核心。
+
+### Chapter 12 Agent 生命周期
+
+主要内容：
+
+- Agent 生命周期
+- 状态转换
+- 从请求到结果的完整执行链路
+
+### Chapter 13 Goal
+
+主要内容：
+
+- 目标理解
+- 目标转换
+- Goal Planning
+
+### Chapter 14 Planner
+
+主要内容：
+
+- 任务拆解
+- Planning Algorithm
+- Plan Update
+- Plan Execution
+
+### Chapter 15 Tool
+
+主要内容：
+
+- Tool Registry
+- Tool Selection
+- Tool Routing
+- Tool Result
+
+### Chapter 16 Memory
+
+主要内容：
+
+- Working Memory
+- Long-term Memory
+- Memory Update
+- Memory Retrieval
+
+### Chapter 17 Context Engineering
+
+主要内容：
+
+- Context Assembly
+- Context Compression
+- Context Window 管理
+- Prompt、Memory、Tool Result 的上下文组织
+
+### Chapter 18 Observation
+
+主要内容：
+
+- Tool Result
+- Observation
+- Observation 到下一步决策的转换
+
+### Chapter 19 Reflection
+
+主要内容：
+
+- Reflection
+- Retry
+- Repair
+- Failure Recovery
+
+### Chapter 20 State Machine
+
+主要内容：
+
+- 为什么 Agent 本质是状态机
+- 状态、事件、转移
+- Agent Runtime 中的状态管理
+
+### Chapter 21 Workflow Engine
+
+主要内容：
+
+- Workflow
+- DAG
+- 事件驱动
+- Workflow 与 Agent Runtime 的组合方式
+
+### Chapter 22 Multi-Agent
+
+主要内容：
+
+- Agent Communication
+- Task Delegation
+- 协作、冲突与一致性
+
+### Chapter 23 Agent Architecture
+
+总结企业级 Agent 架构。
+
+输出：从组件到系统的完整 Agent Architecture。
+
+## Part IV Agent Engineering —— 如何构建企业级 Agent
+
+目标：Production Ready。
+
+这一部分关注工程能力。
+
+### Chapter 24 Prompt Engineering
+
+主要内容：
+
+- Prompt Architecture
+- Prompt Version
+- Prompt Evaluation
+
+### Chapter 25 Knowledge Engineering
+
+主要内容：
+
+- 知识组织
+- 知识生命周期
+- 知识更新与治理
+
+### Chapter 26 RAG
+
+主要内容：
+
+- Index
+- Chunk
+- Retrieve
+- Generate
+- RAG 与 Agent 的关系
+
+### Chapter 27 Semantic Layer
+
+主要内容：
+
+- 为什么 Agent 需要 Semantic Layer
+- 企业数据语义
+- 指标、维度、口径与权限
+
+### Chapter 28 Guardrails
+
+主要内容：
+
+- 安全
+- 输出控制
+- 权限
+- 风险拦截
+
+### Chapter 29 Evaluation
+
+主要内容：
+
+- Agent 如何评估
+- Offline Evaluation
+- Online Evaluation
+- Benchmark
+
+### Chapter 30 Observability
+
+主要内容：
+
+- Logging
+- Tracing
+- Timeline
+- Agent 执行过程可观测性
+
+### Chapter 31 Performance
+
+主要内容：
+
+- Latency
+- Cache
+- Batch
+- Streaming
+
+### Chapter 32 Cost Optimization
+
+主要内容：
+
+- Token
+- 模型路由
+- Cache
+- 成本与质量平衡
+
+### Chapter 33 Deployment
+
+主要内容：
+
+- 服务化
+- 扩缩容
+- 多模型部署
+- 生产环境发布
+
+## Part V Frameworks —— 主流 Agent 框架设计
+
+目标：学习设计思想，不学习 API。
+
+每一章统一回答：
+
+- 为什么这样设计？
+- 优点是什么？
+- 缺点是什么？
+- 适用场景是什么？
+- 源码如何实现？
+
+### Chapter 34 OpenAI Agents SDK
+
+定位：OpenAI 官方 Agent 工程框架。
+
+### Chapter 35 LangGraph
+
+定位：基于图和状态机的 Agent / Workflow 编排框架。
+
+### Chapter 36 Google ADK
+
+定位：Google Agent Development Kit。
+
+### Chapter 37 CrewAI
+
+定位：面向角色分工的 Multi-Agent 框架。
+
+### Chapter 38 AutoGen
+
+定位：面向多 Agent 对话与协作的框架。
+
+### Chapter 39 PydanticAI
+
+定位：面向 Python 类型系统和结构化输出的 Agent 框架。
+
+### Chapter 40 LlamaIndex
+
+定位：面向数据、索引、RAG 与 Agent 的框架。
+
+### Chapter 41 Dify
+
+定位：Agent Platform，不是单纯的 Agent Framework。
+
+## Part VI Enterprise Practice —— 企业实践
+
+目标：真正落地。
+
+每章统一模板：
+
+- 背景
+- 需求
+- 架构
+- 代码
+- 上线
+- 踩坑
+- 总结
+
+### Chapter 42 SQL Agent
+
+面向结构化数据查询的 Agent。
+
+### Chapter 43 Data Agent
+
+面向数据分析、指标解释和数据任务执行的 Agent。
+
+### Chapter 44 BI Agent
+
+面向 BI、报表、指标问答和洞察生成的 Agent。
+
+### Chapter 45 Coding Agent
+
+面向代码阅读、修改、测试和提交的 Agent。
+
+### Chapter 46 Enterprise Knowledge Agent
+
+面向企业知识库、制度、文档和流程问答的 Agent。
+
+### Chapter 47 Customer Service Agent
+
+面向客服、工单、知识检索和流程执行的 Agent。
+
+### Chapter 48 Manufacturing Agent
+
+结合制造业场景，讨论生产、质量、设备、供应链与数据平台中的 Agent。
+
+### Chapter 49 Multi-Agent 企业平台
+
+讨论企业级 Multi-Agent 平台的架构、治理和运行机制。
+
+## Part VII Future —— 下一代软件
+
+目标：讨论 Agent 对软件工程和软件形态的长期影响。
+
+### Chapter 50 Agent Platform
+
+企业为什么最终都会建设 Agent Platform。
+
+### Chapter 51 Agent Operating System
+
+主要内容：
+
+- Agent OS
+- Agent Runtime
+- Agent 调度与资源管理
+
+### Chapter 52 Computer Use
+
+主要内容：
+
+- GUI Agent
 - Browser Agent
-- Multi-Agent
+- Computer Use 的工程边界
 
-每个案例应包含：
+### Chapter 53 AI Native Software
 
-- 问题背景
-- 架构设计
-- 运行方式
-- 核心代码
-- 评测方法
-- 局限性说明
+主要内容：
 
-## 第四阶段：企业级 Agent Engineering
+- 什么是 AI Native
+- AI Native 与传统软件的区别
+- AI Native 应用架构
 
-目标：形成差异化方向：Enterprise AI Agent Engineering。
+### Chapter 54 Future of Software Engineering
 
-重点模块：
+主要内容：
 
-- Semantic Layer
-- Metadata
-- Governance
-- Lineage
-- Metrics
-- Data Quality
-- Warehouse / Lakehouse
-- 权限与审计
-- 企业级部署
+- Agent 对软件工程的影响
+- 开发者角色变化
+- 软件系统从流程驱动到目标驱动
 
-关键问题：
+## GitHub 工程组织
 
-- 为什么企业 Agent 离不开 Semantic Layer？
-- 为什么 Data Agent 不应该直接生成 SQL？
-- 如何让 Agent 理解企业指标和业务语义？
-- 如何把数据质量、元数据、权限体系接入 Agent？
-- 如何评估 Agent 在企业环境中的可靠性？
+源码仓库继续围绕教材演进：
 
-## 第五阶段：文档站点与生态
+```text
+ai-agent-engineering/
+├── docs/                    # 教材配套文档
+├── chapters/                # 每章源码
+├── examples/                # 完整案例
+├── framework/               # 自己实现 Agent Runtime
+├── integrations/            # 模型与框架集成
+├── prompts/                 # 提示词模板
+├── datasets/                # 示例数据集
+├── benchmark/               # 基准测试
+├── evaluation/              # 评测方法与脚本
+├── notebooks/               # 实验与分析 Notebook
+├── architecture/            # 架构图与设计说明
+└── scripts/                 # 工具脚本
+```
 
-目标：将 GitHub、Book、Blog 和文档站点统一起来。
-
-可能形态：
-
-- `ai-agent-engineering`：教材配套源码与核心 Runtime
-- `agent.itaoyuyin.com`：文档站点
-- `itaoyuyin.com`：技术博客与系列文章
-- 公众号：内容传播与更新通知
-
-第一阶段只维护一个仓库。等 Runtime、案例和文档成熟后，再考虑拆分独立仓库。
+后续章节源码应尽量复用 `framework/` 中的统一 Runtime，而不是每章复制一套临时代码。
 
 ## 版本与标签建议
 
@@ -114,6 +543,15 @@ v0.1 / chapter01
 v0.2 / chapter02
 v0.3 / chapter03
 ...
+v1.0 / part-i-complete
 ```
 
 读者可以通过 tag 回到某一章对应的代码状态。
+
+## 近期执行优先级
+
+1. 完成 Part I 的 4 篇 Foundations 文章。
+2. 为 `chapters/chapter01` 补齐与文章对应的源码和说明。
+3. 建立章节模板，统一 `Learning Objectives / Summary / Notes / References`。
+4. 为每章建立引用验证清单。
+5. 逐步实现 `framework/runtime` 的最小可运行版本。
