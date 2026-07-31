@@ -1,25 +1,22 @@
-"""Chapter 13: Goal
+"""Chapter 13: turn an ambiguous request into an executable Goal contract."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from goal_runtime import GoalCompiler, GoalEvaluator
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['目标理解', '目标转换', 'Goal Planning', '约束']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    goal = GoalCompiler().compile(
+        {
+            "objective": "生成华东区本月销售异常报告",
+            "constraints": ["只读数据", "不包含个人联系方式"],
+            "success_criteria": ["包含收入指标", "列出异常门店"],
+            "allowed_tools": ["query_sales"],
+            "risk_level": "medium",
+        }
+    )
+    evidence = {"包含收入指标": True, "列出异常门店": True}
+    print(goal)
+    print(GoalEvaluator().evaluate(goal, evidence))
 
 
 if __name__ == "__main__":
-    result = run("demo goal for Goal")
-    print(result)
+    main()

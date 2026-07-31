@@ -1,25 +1,16 @@
-"""Chapter 23: Agent Architecture
+"""Chapter 23: run a small enterprise Agent through policy and audit boundaries."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from enterprise_runtime import AgentRequest, EnterpriseAgentRuntime
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['组件架构', '执行架构', '企业集成', '安全边界']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    runtime = EnterpriseAgentRuntime()
+    response = runtime.run(
+        AgentRequest("run-99", "tenant-a", "user-7", "生成华东销售摘要", ("sales:read",))
+    )
+    print(response)
+    print(runtime.audit.events)
 
 
 if __name__ == "__main__":
-    result = run("demo goal for Agent Architecture")
-    print(result)
+    main()

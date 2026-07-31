@@ -1,25 +1,18 @@
-"""Chapter 18: Observation
+"""Chapter 18: normalize a raw tool response into an Observation."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from observation_runtime import ObservationBuilder, ToolResult
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['Tool Result', 'Observation', '状态更新', '证据质量']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    raw = ToolResult(
+        call_id="call-7",
+        tool_name="query_sales",
+        ok=True,
+        payload={"region": "east", "revenue": 218000},
+        source="warehouse.sales_monthly",
+    )
+    print(ObservationBuilder(max_chars=120).build(raw))
 
 
 if __name__ == "__main__":
-    result = run("demo goal for Observation")
-    print(result)
+    main()

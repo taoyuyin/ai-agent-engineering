@@ -1,25 +1,17 @@
-"""Chapter 19: Reflection
+"""Chapter 19: map a failure to an explicit repair decision."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from reflection_runtime import Failure, RepairController
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['Reflection', 'Retry', 'Repair', 'Failure Recovery']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    controller = RepairController(max_retries=2)
+    for failure in [
+        Failure("TIMEOUT", "warehouse timeout"),
+        Failure("INVALID_SCHEMA", "missing revenue"),
+        Failure("PERMISSION_DENIED", "scope missing"),
+    ]:
+        print(failure.code, "=>", controller.decide("step-1", failure).action)
 
 
 if __name__ == "__main__":
-    result = run("demo goal for Reflection")
-    print(result)
+    main()

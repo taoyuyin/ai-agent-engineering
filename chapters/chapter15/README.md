@@ -1,4 +1,4 @@
-# Chapter 15 Tool
+# Chapter 15 Tool：Agent 连接外部世界的能力边界
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,160 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Tool` 在 AI Agent Engineering 中到底解决什么问题？
+工具已经在 Chapter 10 定义，Runtime 还需要解决什么？当工具达到几十或几百个时，如何发现、选择、路由和治理？
 
 ## Chapter Conclusion
 
-Tool 是 Agent 连接外部世界的能力边界。
+Tool 不只是一个 Python 函数，而是带 capability、schema、权限、成本、风险和运行策略的受治理能力。模型可以建议工具，Tool Runtime 决定哪些工具可见、可选和可执行。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 区分 Tool Definition、Registry、Selector、Router 与 Executor
+- 设计 capability 与权限双重过滤
+- 比较直接函数、框架工具、MCP 与 API Gateway
+- 处理工具过多、命名冲突和路由失败
+- 运行一个成本感知的 Tool Router MVP
 
-- Tool Registry
-- Tool Selection
-- Tool Routing
-- Tool Result
-- 权限
+## 15.1 Tool Control Plane
 
-## 本章定位
+```text
+Tool Catalog
+  ↓ discovery / version / health
+Policy Filter
+  ↓ actor + tenant + scope
+Capability Router
+  ↓ quality + latency + cost
+Model-visible Tool Set
+  ↓ structured call
+Execution Gateway
+  ↓ validate + authorize + timeout
+Observation
+```
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+先过滤再交给模型，能减少 token、误选和越权风险。绝不能把所有工具交给模型，再希望它自觉不调用无权限工具。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+## 15.2 Tool Metadata
 
-## 主要内容
+除了输入 schema，还需要：
 
-### 15.1 Tool Registry
+| 字段 | 作用 |
+|---|---|
+| capability tags | 与任务需求匹配 |
+| required scopes | 执行授权 |
+| read_only / side_effecting | 审批与重试策略 |
+| cost / latency class | 路由与预算 |
+| owner / version | 运维与兼容 |
+| data classification | 数据治理 |
+| health / rate limit | 可用性路由 |
 
-Tool Registry 是本章理解 `Tool` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+Tool description 面向模型，metadata 面向 Runtime，两者不要混为一段自然语言。
 
-在实际系统中，`Tool Registry` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 15.3 Tool Selection 与 Routing
 
-### 15.2 Tool Selection
+Selection 是“模型在可见工具中选哪个”；Routing 是“平台将 capability 映射到哪个实现”。
 
-Tool Selection 是本章理解 `Tool` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+例如 `sales.read_summary` 可以路由到：
 
-在实际系统中，`Tool Selection` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+- 实时 API：新鲜但成本高；
+- 数仓查询：延迟高但适合分析；
+- 缓存：低延迟但可能陈旧。
 
-### 15.3 Tool Routing
+Runtime 可按数据新鲜度、SLA、费用和健康状态选择实现，不必把底层差异暴露给模型。
 
-Tool Routing 是本章理解 `Tool` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 15.4 工具规模问题
 
-在实际系统中，`Tool Routing` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+工具过多会带来：
 
-### 15.4 Tool Result
+- schema 占用 Context；
+- 相似描述导致误选；
+- 同名工具冲突；
+- 低权限用户看到不应知道的能力；
+- 每次请求都做全量检索。
 
-Tool Result 是本章理解 `Tool` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+常见解法：
 
-在实际系统中，`Tool Result` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+1. 按领域预路由；
+2. capability/tool search；
+3. 延迟加载 schema；
+4. 使用 namespace；
+5. 根据身份构造临时可见集；
+6. 对路由器单独评估 recall@k。
 
-### 15.5 权限
+## 15.5 工具体系横向对比
 
-权限 是本章理解 `Tool` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 方案 | 发现 | 路由 | 跨进程 | 治理重点 |
+|---|---|---|---|---|
+| Python Registry | 代码注册 | 自定义 | 否 | 简单、低开销 |
+| LangChain Tools | decorator/schema/ToolNode | 模型或图 | 可适配 | 生态与错误处理 |
+| OpenAI Agents SDK Tools | function/hosted/MCP/agent-as-tool | Runner | 是 | approval、trace |
+| Google ADK Tools | function/OpenAPI/MCP 等 | Agent/Workflow | 是 | callback、确认与认证 |
+| MCP | tools/list + tools/call | Host 聚合 | 是 | 互操作与信任 |
+| API Gateway | OpenAPI/API catalog | 规则/服务路由 | 是 | 网络、认证、限流 |
 
-在实际系统中，`权限` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+MCP 是 AI-facing 协议，API Gateway 是服务控制面；企业通常将 MCP Server 放在 Gateway 与语义层之上。
 
-## Python 示例
+## 15.6 Tool Result 不等于 Observation
 
-本章配套示例见：
+Tool Result 是供应商或函数返回的原始数据；Observation 是 Runtime 归一化后的证据：
+
+- 结果大小受限；
+- 来源和时间明确；
+- 错误可分类；
+- 外部文本标记为不可信；
+- 敏感字段被脱敏；
+- 关联 call_id 和 step_id。
+
+Chapter 18 会实现这层转换。
+
+## 15.7 业务案例：多数据源销售查询
+
+一个销售 Agent 有三种读取实现。Router 先检查 `sales:read`，再根据请求：
+
+- “刚刚发生的订单” → 实时 API；
+- “过去一年趋势” → 数仓；
+- “首页概览” → 5 分钟缓存。
+
+模型只看到统一的 `get_sales_summary`，避免将基础设施细节变成模型决策负担。
+
+## 15.8 Python MVP
 
 ```bash
 python chapters/chapter15/example.py
+python -m unittest discover -s chapters/chapter15 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 按 capability、scope、read-only 与 cost 过滤和排序，并在真正调用时再次授权，体现“可见性过滤不替代执行授权”。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] Tool 有 owner、version、capability 和风险等级
+- [ ] 可见工具集按身份与任务动态构造
+- [ ] Router 有质量、延迟、成本和健康信号
+- [ ] 执行时重新验证 scope 和 tenant
+- [ ] 读写工具分离，副作用需要确认
+- [ ] namespace 防止同名和 shadowing
+- [ ] 评估路由 recall、误选率和降级行为
 
 ## Summary
 
-Tool 是 Agent 连接外部世界的能力边界。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Tool Engineering 的核心不是注册更多函数，而是让正确用户在正确目标下，以可控成本调用正确能力。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+Chapter 10 关注单次 Function Calling contract；本章关注大规模 Tool Catalog、选择、路由和治理。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] OpenAI Agents SDK, Tools.
+https://openai.github.io/openai-agents-python/tools/
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] LangChain, Tools.
+https://docs.langchain.com/oss/python/langchain/tools
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Google ADK, Custom tools.
+https://adk.dev/tools-custom/
+
+[4] MCP, Architecture.
+https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture
+
+以上 URL 已在 2026-07-31 核对。

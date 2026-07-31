@@ -1,25 +1,22 @@
-"""Chapter 12: Agent 生命周期
+"""Chapter 12: drive an Agent run through its legal lifecycle."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from lifecycle_runtime import AgentRun, LifecycleEngine, RunStatus
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['生命周期', '状态转换', '运行循环', '结束条件']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    run = AgentRun("run-001", "生成本周销售异常报告", max_steps=4)
+    engine = LifecycleEngine()
+    for target, reason in [
+        (RunStatus.VALIDATING, "goal_received"),
+        (RunStatus.PLANNING, "goal_valid"),
+        (RunStatus.RUNNING, "plan_ready"),
+        (RunStatus.COMPLETED, "success_criteria_met"),
+    ]:
+        engine.transition(run, target, reason)
+    print(run.status.value)
+    for event in run.events:
+        print(event)
 
 
 if __name__ == "__main__":
-    result = run("demo goal for Agent 生命周期")
-    print(result)
+    main()

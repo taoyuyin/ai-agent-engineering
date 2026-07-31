@@ -1,25 +1,22 @@
-"""Chapter 21: Workflow Engine
+"""Chapter 21: run a deterministic DAG with a human approval gate."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from workflow_runtime import Task, Workflow
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['Workflow', 'DAG', '事件驱动', 'Agent Step']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    workflow = Workflow(
+        [
+            Task("query", lambda state: {"revenue": 218000}),
+            Task("draft", lambda state: {"report": "ready"}, depends_on=("query",)),
+            Task("publish", lambda state: {"published": True}, depends_on=("draft",), approval=True),
+        ]
+    )
+    workflow.run_until_blocked()
+    print(workflow.statuses())
+    workflow.approve("publish")
+    workflow.run_until_blocked()
+    print(workflow.statuses())
 
 
 if __name__ == "__main__":
-    result = run("demo goal for Workflow Engine")
-    print(result)
+    main()

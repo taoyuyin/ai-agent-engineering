@@ -1,4 +1,4 @@
-# Chapter 19 Reflection
+# Chapter 19 Reflection：失败之后，系统应该重试、修复还是停止
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,154 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Reflection` 在 AI Agent Engineering 中到底解决什么问题？
+Reflection 为什么不是“让模型再想一次”？如何基于验证信号选择 Retry、Repair、Replan、Escalate 或 Abort？
 
 ## Chapter Conclusion
 
-Reflection 让 Agent 能够在失败、低置信度或结果不一致时自我检查和修复。
+Reflection 的工程本质是 Failure Diagnosis + Repair Policy。只有存在可观察错误和验证器时，反思才可能提高质量；无条件自我反思容易增加成本并重复错误。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 区分 Retry、Repair、Replan、Compensation 和 Escalation
+- 建立错误 taxonomy 与修复策略
+- 设计重试预算、退避和防循环机制
+- 比较模型反思与确定性验证
+- 运行错误驱动 Repair Controller MVP
 
-- Reflection
-- Retry
-- Repair
-- Failure Recovery
-- 质量判断
+## 19.1 Reflection Loop
 
-## 本章定位
+```text
+Observation
+  ↓
+Verifier
+  ↓ failure(code, evidence)
+Failure Classifier
+  ↓
+Repair Policy
+  ├── retry same action
+  ├── repair arguments
+  ├── choose another tool
+  ├── replan downstream
+  ├── compensate side effect
+  └── escalate / abort
+```
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+“答案看起来不够好”不是可操作错误；`MISSING_DENOMINATOR`、`SCHEMA_INVALID` 才是。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+## 19.2 Retry ≠ Repair
 
-## 主要内容
+| 动作 | 是否改变输入/计划 | 适用 |
+|---|---:|---|
+| Retry | 否或只改时机 | timeout、rate limit |
+| Repair Arguments | 是 | schema、范围错误 |
+| Reroute | 改工具实现 | provider unavailable |
+| Replan | 改下游步骤 | 假设错误、证据不足 |
+| Compensation | 产生逆向业务动作 | 已发生副作用 |
+| Escalate | 交给人/上层 | 权限、高风险、不确定 |
 
-### 19.1 Reflection
+权限拒绝绝不能靠 Retry 解决。
 
-Reflection 是本章理解 `Reflection` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 19.3 Retry Policy
 
-在实际系统中，`Reflection` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+可靠重试需要：
 
-### 19.2 Retry
+- 仅针对明确 transient error；
+- exponential backoff + jitter；
+- max attempts 与 max elapsed time；
+- 幂等键；
+- circuit breaker；
+- 尊重 `Retry-After`；
+- 记录每次 reason code。
 
-Retry 是本章理解 `Reflection` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+LLM 调用也可能失败，但重新生成会产生不同输出；它是新的尝试，不是字节级重放。
 
-在实际系统中，`Retry` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 19.4 Verification 信号
 
-### 19.3 Repair
+| 场景 | 强验证器 |
+|---|---|
+| Coding | compile、unit test、static analysis |
+| SQL | parser、只读策略、schema、row count |
+| RAG | citation entailment、source presence |
+| Data | metric definition、sample size、freshness |
+| Workflow | state invariant、idempotency record |
 
-Repair 是本章理解 `Reflection` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+模型 Judge 可做弱信号，但要校准偏差，并避免让同一模型只评价自己的表达风格。
 
-在实际系统中，`Repair` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 19.5 Reflection 方法对比
 
-### 19.4 Failure Recovery
+| 方法 | 反馈来源 | 优点 | 风险 |
+|---|---|---|---|
+| Prompt self-reflection | 模型自身 | 简单 | 同源偏差 |
+| Reflexion memory | 环境反馈 + 文字记忆 | 可跨尝试学习 | 错误记忆污染 |
+| Deterministic verifier | 代码/规则 | 稳定、可审计 | 覆盖有限 |
+| Model critic | 另一模型/角色 | 可评语义 | 成本与一致性 |
+| Human review | 专家 | 适合高风险 | 延迟与规模 |
 
-Failure Recovery 是本章理解 `Reflection` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+生产系统优先使用强验证器，再用模型补充开放语义判断。
 
-在实际系统中，`Failure Recovery` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 19.6 防止反思循环
 
-### 19.5 质量判断
+Runtime 应检测：
 
-质量判断 是本章理解 `Reflection` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- 相同工具 + 相同参数重复；
+- 相同错误连续出现；
+- 计划版本没有实质变化；
+- token/费用快速增长；
+- critic 与 actor 相互否定；
+- 没有新增 evidence。
 
-在实际系统中，`质量判断` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+达到阈值应降级、澄清或升级人工，而不是继续生成。
 
-## Python 示例
+## 19.7 业务案例：Coding Agent
 
-本章配套示例见：
+补丁编译失败：
+
+1. 编译器返回结构化文件、行号、错误码；
+2. Repair 只修改相关文件；
+3. 重新编译；
+4. 编译通过后运行目标测试；
+5. 测试失败按 failure 分类；
+6. 达到修复预算后交给开发者。
+
+“让模型再审查一遍所有代码”范围过大且不可验证。
+
+## 19.8 Python MVP
 
 ```bash
 python chapters/chapter19/example.py
+python -m unittest discover -s chapters/chapter19 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 把权限、schema、质量、transient 和未知错误映射到不同动作，并为 transient retry 设置独立 step budget。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] Verifier 输出稳定 failure code
+- [ ] Retry 只处理 transient error
+- [ ] 权限错误 fail closed
+- [ ] 参数修复不绕过 schema
+- [ ] Replan 只修改未完成部分
+- [ ] 副作用有幂等与补偿
+- [ ] 检测重复动作和无新增证据
+- [ ] 达到预算后升级或停止
 
 ## Summary
 
-Reflection 让 Agent 能够在失败、低置信度或结果不一致时自我检查和修复。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Reflection 不是更长的思考，而是反馈驱动的控制策略。诊断越结构化，修复越局部，Agent 越可靠。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+本章不要求模型暴露私有思维链；工程 trace 记录 failure、decision、evidence 和 repair action。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] Shinn et al., Reflexion.
+https://arxiv.org/abs/2303.11366
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] LangGraph, Workflows and agents.
+https://docs.langchain.com/oss/python/langgraph/workflows-agents
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Temporal, Failure detection.
+https://docs.temporal.io/encyclopedia/detecting-workflow-failures
+
+以上 URL 已在 2026-07-31 核对。

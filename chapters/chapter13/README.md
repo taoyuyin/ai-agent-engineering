@@ -1,4 +1,4 @@
-# Chapter 13 Goal
+# Chapter 13 Goal：把用户意图编译成可执行契约
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,159 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Goal` 在 AI Agent Engineering 中到底解决什么问题？
+“帮我分析一下销售”为什么还不是可执行目标？Runtime 如何得到约束、权限和可验证的完成条件？
 
 ## Chapter Conclusion
 
-Goal 是 Agent Runtime 的输入核心，决定了计划、工具和评估标准。
+Goal 不是一段 Prompt，而是 Runtime 的输入契约。高质量 Goal 同时描述 objective、constraints、success criteria、allowed actions、risk 和 evidence requirements。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 区分 Intent、Goal、Task 与 Success Criterion
+- 将模糊请求转换为结构化 GoalSpec
+- 识别缺失信息并选择澄清或安全默认值
+- 设计可由代码或人工验证的完成条件
+- 运行 Goal Compiler 与 Evaluator MVP
 
-- 目标理解
-- 目标转换
-- Goal Planning
-- 约束
-- 完成条件
+## 13.1 从 Intent 到 Goal
 
-## 本章定位
+```text
+User Intent
+  ↓  parse + resolve identity/context
+Goal Draft
+  ↓  clarify + policy validation
+Goal Contract
+  ↓
+Planner / Workflow
+```
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+示例输入：“把最近销售不好的门店处理一下。”
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+它缺少：
 
-## 主要内容
+- “最近”的时间窗口；
+- “不好”的指标和阈值；
+- “处理”是生成建议还是关闭门店；
+- 用户可访问的区域；
+- 输出格式和审批要求。
 
-### 13.1 目标理解
+Agent 不应通过想象填满高风险空白。
 
-目标理解 是本章理解 `Goal` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 13.2 Goal Contract
 
-在实际系统中，`目标理解` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+```json
+{
+  "objective": "识别华东区 2026-07 收入环比下降超过 10% 的门店",
+  "constraints": ["只读数据", "排除新开业不足 30 天门店"],
+  "success_criteria": ["指标定义已引用", "异常门店有证据"],
+  "allowed_tools": ["get_sales_summary"],
+  "risk_level": "medium"
+}
+```
 
-### 13.2 目标转换
+Success Criterion 应满足：
 
-目标转换 是本章理解 `Goal` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- 可观察，而不是“结果要好”；
+- 与证据对应；
+- 有范围与阈值；
+- 在预算内可验证；
+- 不与约束冲突。
 
-在实际系统中，`目标转换` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 13.3 Goal Validation
 
-### 13.3 Goal Planning
+验证分四层：
 
-Goal Planning 是本章理解 `Goal` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 层 | 问题 |
+|---|---|
+| Syntax | 字段是否完整、类型是否正确 |
+| Semantic | objective 与 criteria 是否一致 |
+| Policy | 用户是否有权请求该目标 |
+| Feasibility | 当前工具、数据和预算能否完成 |
 
-在实际系统中，`Goal Planning` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+高风险 Goal 还需检查副作用、审批链和回滚方案。
 
-### 13.4 约束
+## 13.4 澄清还是默认
 
-约束 是本章理解 `Goal` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 缺失项 | 建议 |
+|---|---|
+| 展示格式 | 可使用安全默认值 |
+| 低风险排序方式 | 可默认并告知 |
+| 数据范围/租户 | 必须从身份确定，不让模型猜 |
+| 金额、收件人、删除范围 | 必须澄清或审批 |
+| 成功标准 | 若无法推导，应澄清 |
 
-在实际系统中，`约束` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+澄清问题也有成本。Runtime 应只问会改变计划、安全或结果的问题。
 
-### 13.5 完成条件
+## 13.5 工具与框架对比
 
-完成条件 是本章理解 `Goal` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 方案 | Goal 表达 | 优点 | 局限 |
+|---|---|---|---|
+| JSON Schema / Pydantic | typed GoalSpec | 明确、可验证、跨模型 | 语义冲突仍需业务规则 |
+| OpenAI Agents SDK | instructions、input、output type、guardrails | 与 Runner 集成 | 领域 Goal 仍需应用建模 |
+| LangGraph | typed state + entry node | Goal 可进入持久状态 | schema 不自动产生验收标准 |
+| Google ADK | agent instruction + session state | 运行时上下文丰富 | 应建立独立领域契约 |
+| BPMN/Workflow Input | 表单与流程变量 | 确定性、审计好 | 动态开放目标表达较弱 |
 
-在实际系统中，`完成条件` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+任何框架的 Prompt 字段都不应成为企业 Goal 的唯一存储。
 
-## Python 示例
+## 13.6 Goal 与 Planner 的边界
 
-本章配套示例见：
+- Goal 描述 **what + constraints + done**；
+- Planner 描述 **how + order + dependencies**；
+- Tool 描述 **capabilities**；
+- Evaluator 判断 **done or not**。
+
+若 Goal 直接包含固定执行步骤，它可能已经是 Workflow；若 Planner 可以修改成功标准，边界就失控了。
+
+## 13.7 业务案例：客服退款
+
+用户说“给这个客户退钱”。Goal Compiler 应补齐：
+
+- 订单 ID 与租户；
+- 可退金额和币种；
+- 退款原因；
+- 用户权限；
+- 是否超出自动审批阈值；
+- 完成条件：退款网关返回成功且账务事件落库。
+
+“模型生成了退款成功文案”不是完成条件。
+
+## 13.8 Python MVP
 
 ```bash
 python chapters/chapter13/example.py
+python -m unittest discover -s chapters/chapter13 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 将字典编译为不可变 `GoalSpec`，强制 objective、success criteria 和 risk 合法，再用 evidence map 评估完成状态。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] Goal 使用版本化结构，而非仅保存 Prompt
+- [ ] 包含 objective、constraints、criteria、tools、risk
+- [ ] 身份和租户由可信系统提供
+- [ ] 高风险歧义必须澄清
+- [ ] success criteria 可由证据验证
+- [ ] Goal 变更产生新版本和审计事件
+- [ ] Planner 无权修改业务验收标准
 
 ## Summary
 
-Goal 是 Agent Runtime 的输入核心，决定了计划、工具和评估标准。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Goal 是自然语言世界与确定性 Runtime 之间的编译产物。Goal 越模糊，Planner 的自由度越大，系统风险也越高。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+Goal Understanding 可以使用模型，但 Goal Validation 必须结合确定性 schema、身份、策略和业务规则。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] OpenAI Agents SDK, Agents.
+https://openai.github.io/openai-agents-python/agents/
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] LangGraph, Graph API.
+https://docs.langchain.com/oss/python/langgraph/graph-api
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] JSON Schema.
+https://json-schema.org/understanding-json-schema/
+
+以上 URL 已在 2026-07-31 核对。

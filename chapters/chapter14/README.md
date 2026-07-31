@@ -1,4 +1,4 @@
-# Chapter 14 Planner
+# Chapter 14 Planner：从目标到可修复的执行计划
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,157 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Planner` 在 AI Agent Engineering 中到底解决什么问题？
+Planner 应输出自然语言步骤还是可执行依赖图？什么时候预先计划，什么时候边执行边规划？
 
 ## Chapter Conclusion
 
-Planner 把目标拆成可执行步骤，并在运行过程中根据反馈更新计划。
+Planner 的职责是把 Goal 转换为满足约束的可执行结构，并根据 Observation 更新未完成部分。计划不是模型思维链，而是 Runtime 可验证、可持久化的公共状态。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 理解 decomposition、dependency、ready queue 和 replan
+- 比较静态、动态、分层与搜索式规划
+- 设计结构化 Plan/PlanStep
+- 防止循环依赖、无界计划和计划漂移
+- 运行依赖图 Planner MVP
 
-- 任务拆解
-- Planning Algorithm
-- Plan Update
-- Plan Execution
-- 计划修复
+## 14.1 Plan 的最小结构
 
-## 本章定位
+```text
+Plan
+├── plan_id / goal_version
+├── steps[]
+│   ├── step_id
+│   ├── objective
+│   ├── depends_on[]
+│   ├── required_capability
+│   ├── success_condition
+│   └── status
+└── budget / version
+```
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+自然语言列表不能可靠表达依赖、并行、状态和重试。生产 Planner 应输出严格 schema，Runtime 再验证图结构和工具可用性。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+## 14.2 Planning 策略横向对比
 
-## 主要内容
+| 策略 | 何时生成计划 | 优点 | 缺点 | 适用 |
+|---|---|---|---|---|
+| Static Workflow | 开发期 | 可预测、易审计 | 无法应对未知情况 | 固定审批 |
+| Plan-and-Execute | 运行开始 | 全局结构清晰 | 早期假设可能失效 | 报告、研究 |
+| ReAct | 每步决策 | 适应反馈 | 容易局部贪心、步骤多 | 搜索与工具任务 |
+| Hierarchical | 先里程碑再细化 | 适合大目标 | 状态与预算复杂 | Coding/Data Agent |
+| Search / ToT | 多候选评分 | 可探索替代路径 | 成本高 | 高价值规划问题 |
 
-### 14.1 任务拆解
+默认应选择最简单的策略。确定流程用 Workflow；只在环境不确定时增加动态规划。
 
-任务拆解 是本章理解 `Planner` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 14.3 任务拆解原则
 
-在实际系统中，`任务拆解` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+一个 Step 应：
 
-### 14.2 Planning Algorithm
+- 只产生一种可验证结果；
+- 输入依赖明确；
+- 能映射到一个 capability 或子流程；
+- 失败可分类；
+- 粒度足够支持 checkpoint，但不过度碎片化。
 
-Planning Algorithm 是本章理解 `Planner` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+“分析数据”太大；“查询华东月收入并验证数据新鲜度”更可执行。
 
-在实际系统中，`Planning Algorithm` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 14.4 Plan Validation
 
-### 14.3 Plan Update
+执行前检查：
 
-Plan Update 是本章理解 `Planner` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+1. step ID 唯一；
+2. 依赖存在且无环；
+3. 至少有 ready step；
+4. required capability 可满足；
+5. 权限和预算覆盖；
+6. 每个 terminal path 都能得到 Goal evidence。
 
-在实际系统中，`Plan Update` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+模型可以生成计划，不能绕过验证器。
 
-### 14.4 Plan Execution
+## 14.5 Plan Update 与 Repair
 
-Plan Execution 是本章理解 `Planner` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+Observation 到达后，Planner 只能修改未完成部分：
 
-在实际系统中，`Plan Execution` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+```text
+failed step
+  ├── transient → same step retry
+  ├── invalid arguments → repair step input
+  ├── missing capability → replace step/tool
+  ├── wrong assumption → replan downstream
+  └── policy denied → abort/escalate
+```
 
-### 14.5 计划修复
+已产生副作用的 Step 不应被简单删除。它需要补偿步骤或人工处置。
 
-计划修复 是本章理解 `Planner` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 14.6 框架横向对比
 
-在实际系统中，`计划修复` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+| 工具 | 规划表示 | 动态性 | 持久化 | 适用 |
+|---|---|---:|---:|---|
+| LangGraph | graph/state/Command | 高 | checkpoint | 动态 Agent 图 |
+| Google ADK Graph Workflow | graph route / dynamic workflow | 高 | session/runtime | Google Agent |
+| OpenAI Agents SDK | Runner loop、handoff、agent-as-tool | 中高 | session/集成 | 模型驱动 orchestration |
+| Temporal | code workflow + activities | 中 | Event History | 长期可靠流程 |
+| Airflow | DAG + task dependency | 低至中 | metadata DB | 批处理与数据管道 |
 
-## Python 示例
+Airflow 的 DAG 拓扑适合相对稳定的依赖；Agent 的动态步骤更适合状态图或在 Workflow Activity 内部运行。
 
-本章配套示例见：
+## 14.7 业务案例：数据质量分析
+
+Goal：定位订单收入下降原因。
+
+```text
+validate_metric_definition
+        ↓
+check_data_freshness
+        ↓
+query_revenue ───→ query_order_count
+        └────────→ query_average_order_value
+                         ↓
+                   verify_explanation
+```
+
+如果新鲜度失败，后续查询不应执行；如果某一拆分维度样本过小，应调整下游计划而不是重跑全部步骤。
+
+## 14.8 Python MVP
 
 ```bash
 python chapters/chapter14/example.py
+python -m unittest discover -s chapters/chapter14 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 实现依赖验证、循环检测、ready queue、完成与失败修复。它使用确定性输入，便于先理解 Planner contract，再接入模型。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] Plan 使用严格 schema 和版本
+- [ ] 记录对应 goal_version
+- [ ] 执行前检查依赖图、能力、权限和预算
+- [ ] Step 有 success condition
+- [ ] 只修改未完成的下游计划
+- [ ] 副作用步骤使用补偿，不做盲目回滚
+- [ ] 限制最大 step、深度、分支和 replan 次数
 
 ## Summary
 
-Planner 把目标拆成可执行步骤，并在运行过程中根据反馈更新计划。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Planner 不是让模型“想得更久”，而是把行动结构公开给 Runtime。可执行、可验证、可修复的计划，才是 Agent Architecture 中有价值的计划。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+Plan 内容可以由 LLM 生成，但 dependency validation、权限与预算检查应由确定性代码执行。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] LangGraph, Workflows and agents.
+https://docs.langchain.com/oss/python/langgraph/workflows-agents
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] Google ADK, Template agent workflows.
+https://adk.dev/agents/workflow-agents/
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Apache Airflow, DAGs.
+https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html
+
+[4] Temporal, Workflows.
+https://docs.temporal.io/workflows
+
+以上 URL 已在 2026-07-31 核对。

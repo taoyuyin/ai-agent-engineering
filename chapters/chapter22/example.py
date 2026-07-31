@@ -1,25 +1,17 @@
-"""Chapter 22: Multi-Agent
+"""Chapter 22: delegate a task to a capability-scoped specialist."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from multi_agent_runtime import AgentCard, Coordinator, TaskEnvelope
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['Agent Communication', 'Task Delegation', '角色分工', '冲突']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    coordinator = Coordinator(max_delegations=3)
+    coordinator.register(
+        AgentCard("data-agent", ("sales", "analysis"), ("sales:read",)),
+        lambda task: {"answer": "华东收入下降 12%", "confidence": 0.91, "evidence": ["query-7"]},
+    )
+    task = TaskEnvelope("task-1", "分析华东销售异常", ("sales", "analysis"), ("sales:read",))
+    print(coordinator.delegate(task))
 
 
 if __name__ == "__main__":
-    result = run("demo goal for Multi-Agent")
-    print(result)
+    main()

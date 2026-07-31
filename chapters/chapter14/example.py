@@ -1,25 +1,21 @@
-"""Chapter 14: Planner
+"""Chapter 14: execute a dependency-aware plan and repair one failed step."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from planner_runtime import Plan, PlanStep
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['任务拆解', 'Planning Algorithm', 'Plan Update', 'Plan Execution']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    plan = Plan(
+        [
+            PlanStep("load", "加载销售数据"),
+            PlanStep("analyze", "分析异常", depends_on=("load",)),
+            PlanStep("report", "生成报告", depends_on=("analyze",)),
+        ]
+    )
+    while not plan.complete:
+        step = plan.ready_steps()[0]
+        plan.mark_completed(step.step_id, {"ok": True})
+        print("completed:", step.step_id)
 
 
 if __name__ == "__main__":
-    result = run("demo goal for Planner")
-    print(result)
+    main()

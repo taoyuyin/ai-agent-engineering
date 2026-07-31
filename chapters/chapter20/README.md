@@ -1,4 +1,4 @@
-# Chapter 20 State Machine
+# Chapter 20 State Machine：Agent 为什么本质上是状态转换系统
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,154 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`State Machine` 在 AI Agent Engineering 中到底解决什么问题？
+模型输出具有概率性，为什么 Agent Runtime 仍应使用确定性状态机？状态、事件、转移和 checkpoint 如何组合？
 
 ## Chapter Conclusion
 
-Agent 本质上是一个目标驱动的状态机。
+Agent 的决策内容可以是概率性的，但执行控制必须是显式状态转换。状态机规定当前允许发生什么，事件记录实际发生了什么，持久化让系统可以恢复和审计。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 区分 State、Event、Command、Transition 与 Side Effect
+- 理解 reducer、checkpoint 和 event replay
+- 设计状态不变量与乐观并发
+- 比较状态图、事件溯源和 durable workflow
+- 运行事件重放 State Machine MVP
 
-- 状态
-- 事件
-- 转移
-- 终止状态
-- Runtime 状态管理
+## 20.1 状态机模型
 
-## 本章定位
+```text
+Current State + Event
+        ↓ reducer / transition table
+New State + Commands
+        ↓ executor
+External Side Effects
+        ↓
+New Events
+```
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+- **State**：当前已知事实快照；
+- **Event**：不可变的已发生事实；
+- **Command**：希望执行的动作；
+- **Transition**：哪些事件在当前状态合法；
+- **Side Effect**：数据库、网络、文件等外部变化。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+不要把模型自然语言输出直接当 State；先解析为 Command，再经 Policy 和 Transition 验证。
 
-## 主要内容
+## 20.2 推荐状态
 
-### 20.1 状态
+```text
+Created → Planning → Ready → Running
+                         ↑       ↓
+                     Observation
+                         ↓
+                  Waiting / Repairing
+                         ↓
+             Completed / Failed / Cancelled
+```
 
-状态 是本章理解 `State Machine` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+状态数量不宜过少，否则 `running` 包含一切；也不宜复制每个 Prompt 细节。状态应服务于恢复、查询和策略。
 
-在实际系统中，`状态` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 20.3 State Invariants
 
-### 20.2 事件
+示例不变量：
 
-事件 是本章理解 `State Machine` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- Completed 必须存在通过验证的 evidence；
+- tool_requested 必须对应 allowed tool；
+- Waiting Approval 必须有 pending approval ID；
+- 同一 idempotency key 只能成功一次；
+- tenant_id 在整个 Run 中不可被模型修改；
+- terminal state 不接受新执行事件。
 
-在实际系统中，`事件` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+不变量由代码维护，不由 Prompt 约定。
 
-### 20.3 转移
+## 20.4 Persistence 策略
 
-转移 是本章理解 `State Machine` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 策略 | 保存方式 | 优点 | 局限 |
+|---|---|---|---|
+| Snapshot | 定期完整状态 | 恢复快 | 历史和审计较弱 |
+| Event Sourcing | 不可变事件流 | 完整审计、可重放 | reducer/version 复杂 |
+| Checkpoint + Log | 快照加增量事件 | 平衡恢复与审计 | 两套一致性 |
+| Workflow History | 引擎记录命令/事件 | durable replay | 要遵守确定性限制 |
 
-在实际系统中，`转移` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+事件流增长后可做 snapshot，但原始审计保留策略要符合合规要求。
 
-### 20.4 终止状态
+## 20.5 并发与幂等
 
-终止状态 是本章理解 `State Machine` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+两个 worker 同时恢复一个 Run 会重复执行。常见控制：
 
-在实际系统中，`终止状态` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+- optimistic version / expected sequence；
+- lease/lock；
+- inbox 去重；
+- idempotency key；
+- transactional outbox；
+- single-writer per run。
 
-### 20.5 Runtime 状态管理
+仅靠“先查状态再执行”存在竞态。
 
-Runtime 状态管理 是本章理解 `State Machine` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 20.6 工具横向对比
 
-在实际系统中，`Runtime 状态管理` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+| 工具 | 状态模型 | 恢复机制 | 特点 |
+|---|---|---|---|
+| LangGraph | typed state + graph | checkpoint/replay | Agent 状态图 |
+| Temporal | deterministic workflow state | Event History replay | 长期可靠执行 |
+| Prefect | flow/task states | server tracking/retry | Python workflow |
+| XState | finite/statecharts | snapshot/persistence adapter | 前端与通用状态机 |
+| 自研 Event Store | event + reducer | replay/snapshot | 完全控制、维护成本高 |
 
-## Python 示例
+LangGraph 更接近 Agent state graph；Temporal 更接近 durable execution substrate。二者可以集成。
 
-本章配套示例见：
+## 20.7 业务案例：退款 Agent
+
+```text
+Requested
+  ↓ policy_passed
+Approved
+  ↓ gateway_submitted
+Processing
+  ↓ gateway_confirmed
+Completed
+```
+
+如果进程在 gateway 已扣款但事件未落库时崩溃，恢复后可能重复退款。必须让 gateway 使用 idempotency key，并通过对账事件修复不确定状态。
+
+## 20.8 Python MVP
 
 ```bash
 python chapters/chapter20/example.py
+python -m unittest discover -s chapters/chapter20 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 用 transition table 校验事件、EventStore 追加不可变序号、expected sequence 防并发，并通过 reducer replay 重建状态。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] 状态和事件 schema 版本化
+- [ ] 所有转移有显式合法表
+- [ ] terminal state 不可继续执行
+- [ ] 不变量由代码检查
+- [ ] 单 Run 有并发控制
+- [ ] 外部副作用使用幂等键
+- [ ] reducer 支持历史事件版本迁移
+- [ ] checkpoint、审计和数据保留策略明确
 
 ## Summary
 
-Agent 本质上是一个目标驱动的状态机。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+状态机不是限制 Agent 智能，而是限制不可控执行。模型可以提出下一动作，Runtime 只接受当前状态下合法且授权的事件。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+Event Sourcing 不是所有 Agent 的必选项。简单系统可使用事务状态表加审计日志，但仍要保留合法转移和并发控制。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] LangGraph, Persistence.
+https://docs.langchain.com/oss/python/langgraph/persistence
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] Temporal, Workflow replay.
+https://docs.temporal.io/workflows
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Prefect, States.
+https://docs.prefect.io/v3/concepts/states
+
+以上 URL 已在 2026-07-31 核对。

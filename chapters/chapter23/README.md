@@ -1,4 +1,4 @@
-# Chapter 23 Agent Architecture
+# Chapter 23 Agent Architecture：企业级 Agent 的完整系统边界
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,201 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Agent Architecture` 在 AI Agent Engineering 中到底解决什么问题？
+Goal、Planner、Tool、Memory、Context、Observation、Reflection、State Machine、Workflow 和 Multi-Agent 如何组合成企业级架构？
 
 ## Chapter Conclusion
 
-企业级 Agent 架构是目标、模型、工具、记忆、工作流、评测和治理的系统组合。
+企业级 Agent 不是“模型加工具”，而是 Intelligence Plane、Deterministic Control Plane、Data Plane 和 Governance Plane 的组合。模型负责不确定判断，Runtime 与 Workflow 负责状态、安全和可靠执行。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 建立 Agent 的组件、运行和部署架构
+- 明确模型、Runtime、Workflow、工具和数据的信任边界
+- 设计同步、异步和 Human-in-the-loop 执行
+- 对比主流框架在整体架构中的位置
+- 运行一个包含身份、策略、租户数据、证据和审计的 MVP
 
-- 组件架构
-- 执行架构
-- 企业集成
-- 安全边界
-- 平台化
+## 23.1 四个平面
 
-## 本章定位
+```text
+Channels / API / UI
+        ↓
+Governance Plane
+Identity · Policy · Guardrails · Audit · Evaluation
+        ↓
+Deterministic Control Plane
+Lifecycle · State Machine · Workflow · Approval · Budget
+        ↓
+Intelligence Plane
+Goal · Planner · Model Gateway · Context · Reflection · Multi-Agent
+        ↓
+Capability & Data Plane
+Tool Gateway · MCP · Semantic Layer · Memory · Enterprise Systems
+```
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+Governance 不是最后加的一层过滤器，而是穿过每个调用和状态转移。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+## 23.2 核心组件
 
-## 主要内容
+| 组件 | 输入 | 输出 | 关键责任 |
+|---|---|---|---|
+| API/Channel | user request | authenticated request | 身份、限流 |
+| Goal Compiler | request/context | GoalSpec | 澄清、约束、验收 |
+| Runtime | GoalSpec/state | commands/events | 生命周期与预算 |
+| Planner | goal/observation | Plan | 分解与更新 |
+| Context Compiler | state/data | model request | 选择、隔离、预算 |
+| Model Gateway | request/policy | model output | 路由、fallback、usage |
+| Tool Gateway | tool call/identity | ToolResult | schema、权限、执行 |
+| Observation Adapter | result | Observation | 归一、脱敏、来源 |
+| Memory | policy/data | records/retrieval | 持久、更新、遗忘 |
+| Evaluator | output/evidence | verdict | 完成和质量判断 |
+| Workflow | events/tasks | durable progress | 等待、重试、审批 |
 
-### 23.1 组件架构
+## 23.3 一次 Run 的执行序列
 
-组件架构 是本章理解 `Agent Architecture` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+```text
+1. Authenticate request
+2. Compile and validate Goal
+3. Create Run + checkpoint
+4. Select workflow/planning policy
+5. Assemble step context
+6. Call model
+7. Validate proposed command
+8. Execute authorized tool
+9. Normalize Observation
+10. Verify / repair / update plan
+11. Complete, wait, fail or escalate
+12. Persist trace, evidence and metrics
+```
 
-在实际系统中，`组件架构` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+每一步都应有 run_id、tenant_id、actor_id 和 trace context。
 
-### 23.2 执行架构
+## 23.4 信任边界
 
-执行架构 是本章理解 `Agent Architecture` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 数据/动作 | 默认信任 |
+|---|---|
+| System policy / verified identity | 高，但仍版本化 |
+| User request | 不可信输入 |
+| Model output | 不可信 command proposal |
+| Tool/MCP result | 不可信外部 data |
+| Memory | 需来源、权限和新鲜度验证 |
+| Human approval | 需身份、对象版本与审计 |
+| Side effect | 需策略、幂等和确认 |
 
-在实际系统中，`执行架构` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+“来自内部系统”不等于可以当作模型指令。
 
-### 23.3 企业集成
+## 23.5 同步与异步架构
 
-企业集成 是本章理解 `Agent Architecture` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+### 同步
 
-在实际系统中，`企业集成` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+适合秒级问答和只读查询。API worker 可以等待模型与少量工具，但仍要设总 deadline。
 
-### 23.4 安全边界
+### 异步
 
-安全边界 是本章理解 `Agent Architecture` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+适合研究、报表、Coding 和审批任务：
 
-在实际系统中，`安全边界` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+```text
+API → Run Store → Queue/Workflow → Agent Worker
+                            ↓
+                    Tool/Model Gateway
+                            ↓
+                     Events / WebSocket
+```
 
-### 23.5 平台化
+客户端通过 Run API 查询或订阅事件。不要保持一个 HTTP 请求等待数十分钟。
 
-平台化 是本章理解 `Agent Architecture` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 23.6 存储架构
 
-在实际系统中，`平台化` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+至少区分：
 
-## Python 示例
+- **Run Store**：状态、checkpoint、计划；
+- **Event/Audit Store**：不可变事件；
+- **Memory Store**：跨 Run 事实；
+- **Artifact Store**：大文件和工具结果；
+- **Vector Index**：语义召回；
+- **Evaluation Store**：样本、trace 与评分。
 
-本章配套示例见：
+同一张 conversation 表无法承担所有语义。
+
+## 23.7 框架在架构中的位置
+
+| 工具 | 最适合的位置 | 不应单独承担 |
+|---|---|---|
+| OpenAI Agents SDK | Agent Runner、tools、handoff、trace | 企业 IAM 与 durable workflow |
+| LangGraph | 状态图、checkpoint、HITL | 完整 API Gateway/数据治理 |
+| Google ADK | Agent runtime、graph/workflow、Google 部署 | 企业跨域治理全部职责 |
+| Temporal | durable control plane | 模型推理与 Context |
+| Airflow | 批处理/调度 Agent Job | 交互式动态 Agent loop |
+| MCP | capability/data protocol | Agent planning 与授权策略 |
+| AutoGen/CrewAI | multi-agent patterns | 企业状态与安全基座 |
+
+选型应组合能力，而不是寻找一个“全能 Agent 框架”。
+
+## 23.8 部署拓扑
+
+生产环境通常拆分：
+
+- stateless API；
+- horizontally scalable Agent Worker；
+- 独立 Model Gateway；
+- Tool/MCP Gateway；
+- Workflow/Queue；
+- Postgres/Redis/Object Store/Vector DB；
+- OTel Collector 与评估服务；
+- Secret Manager 与 Policy Engine。
+
+不同租户、数据等级和工具风险可以运行在不同安全域。
+
+## 23.9 企业案例：经营分析 Agent Platform
+
+用户通过 SSO 发起报告任务。Goal Compiler 固化数据范围和验收标准，Workflow 冻结 snapshot 并并行调用领域 Agent。所有数据访问经 Semantic/Tool Gateway 执行行级权限，Observation 带来源。Evaluator 检查指标定义和引用，管理者批准后发布。平台记录模型/Prompt/Tool/数据版本，使报告可复现。
+
+## 23.10 Python MVP
 
 ```bash
 python chapters/chapter23/example.py
+python -m unittest discover -s chapters/chapter23 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 是 composition root：`AgentRequest` 携带 tenant/actor/scope，PolicyEnforcer 在数据访问前授权，结果带 evidence，成功和拒绝均写 AuditSink。它不模拟 LLM，而是展示模型之外必须存在的架构边界。
 
-## Engineering Notes
+## 23.11 Production Readiness Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] 所有请求有 identity、tenant、run 和 trace ID
+- [ ] Goal、Plan、State、Tool、Observation schema 版本化
+- [ ] 模型输出只作为 command proposal
+- [ ] Tool Gateway 独立执行授权
+- [ ] Memory 与数据检索在查询阶段隔离租户
+- [ ] 长任务使用 durable workflow
+- [ ] Side effect 有审批、幂等、补偿和对账
+- [ ] Context、trace 和日志执行脱敏
+- [ ] Offline/online evaluation 与发布门禁
+- [ ] 监控质量、延迟、费用、失败与安全事件
+- [ ] 支持模型、Prompt、工具和数据版本回放
 
 ## Summary
 
-企业级 Agent 架构是目标、模型、工具、记忆、工作流、评测和治理的系统组合。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Part III 最终建立的是一个可控制的智能执行系统：Goal 定义成功，Planner 组织工作，Tool 连接外部世界，Memory 与 Context 提供信息，Observation 与 Reflection 闭环反馈，State Machine 与 Workflow 保证可靠，Multi-Agent 扩展专业能力，Governance 贯穿全程。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+本章架构是厂商中立的参考模型。具体项目可以合并组件，但不能删除其责任；例如把 Tool Gateway 写在 Runtime 进程内，仍必须保留独立授权边界。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] OpenAI Agents SDK, Running agents.
+https://openai.github.io/openai-agents-python/running_agents/
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] LangGraph, Overview.
+https://docs.langchain.com/oss/python/langgraph/overview
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Google ADK, Documentation.
+https://adk.dev/
+
+[4] Temporal, Workflows.
+https://docs.temporal.io/workflows
+
+[5] Model Context Protocol, Architecture.
+https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture
+
+以上 URL 已在 2026-07-31 核对。

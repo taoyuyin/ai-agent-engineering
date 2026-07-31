@@ -1,4 +1,4 @@
-# Chapter 12 Agent 生命周期
+# Chapter 12 Agent 生命周期：一次运行如何开始、暂停、恢复和结束
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,155 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Agent 生命周期` 在 AI Agent Engineering 中到底解决什么问题？
+一个目标进入 Agent 后经历哪些状态？Runtime 如何保证它不会无限执行、丢失状态或在失败后重复产生副作用？
 
 ## Chapter Conclusion
 
-Agent 生命周期描述了一个目标从进入系统到完成、失败或交还人工的全过程。
+Agent 不是一次模型调用，而是一个有身份、有预算、有中间状态和终止条件的 Run。生命周期是所有 Planner、Tool、Memory、Reflection 和 Workflow 能力共同遵守的控制边界。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 区分 Agent、Run、Turn、Step 和 Tool Call
+- 设计可暂停、恢复、取消的生命周期
+- 建立终止条件、预算和失败语义
+- 比较 Agent Runner、状态图与工作流引擎的生命周期
+- 运行一个拒绝非法状态转移的 Python MVP
 
-- 生命周期
-- 状态转换
-- 运行循环
-- 结束条件
-- 失败路径
+## 12.1 五个容易混淆的执行单位
 
-## 本章定位
+| 概念 | 含义 | 示例 |
+|---|---|---|
+| Agent | 可复用的能力与策略定义 | Sales Analyst |
+| Run | 为一个目标创建的执行实例 | 分析 7 月华东异常 |
+| Turn | 一次模型决策回合 | 模型决定查询销售 |
+| Step | Runtime 中可持久化的工作单元 | query_sales |
+| Tool Call | 对外部能力的一次调用 | call-17 |
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+Agent 是定义，Run 才是运行状态的归属。生产系统必须为 Run 分配唯一 ID，并让所有模型调用、工具结果、审批与审计记录继承它。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+## 12.2 推荐生命周期
 
-## 主要内容
+```text
+Created
+  ↓
+Validating ─────────────→ Failed
+  ↓
+Planning ───────────────→ Failed
+  ↓
+Running ←───────────────┐
+  ├── Waiting Approval ─┤
+  ├── Waiting Event ────┤
+  ├── Completed         │
+  ├── Failed            │
+  └── Cancelled         │
+```
 
-### 12.1 生命周期
+- **Created**：只完成 Run 身份与输入落库。
+- **Validating**：检查目标、身份、配额、风险与数据边界。
+- **Planning**：生成或选择执行计划。
+- **Running**：模型决策、工具调用和验证循环。
+- **Waiting**：释放计算资源，等待人或外部事件。
+- **Terminal**：Completed、Failed、Cancelled，默认不可再转移。
 
-生命周期 是本章理解 `Agent 生命周期` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+暂停不是“让线程睡眠”。可靠系统应持久化 checkpoint，释放 worker，并在事件到达后恢复。
 
-在实际系统中，`生命周期` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 12.3 终止条件
 
-### 12.2 状态转换
+至少需要五类硬边界：
 
-状态转换 是本章理解 `Agent 生命周期` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+1. Success criteria 已满足；
+2. 最大 turn/step 数；
+3. token、费用和时间预算；
+4. 连续失败或重复动作阈值；
+5. 人工取消或策略拒绝。
 
-在实际系统中，`状态转换` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+“模型说任务完成了”只能作为候选信号。最终完成应由 Goal Evaluator 或业务验证器确认。
 
-### 12.3 运行循环
+## 12.4 Failure、Cancel 与 Timeout
 
-运行循环 是本章理解 `Agent 生命周期` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 终态 | 含义 | 是否可从 checkpoint 重试 |
+|---|---|---|
+| Completed | 验收标准满足 | 通常不需要 |
+| Failed | 系统无法在当前策略下完成 | 视错误类型 |
+| Cancelled | 用户或策略主动终止 | 需显式重新启动 |
+| Timed out | 时间预算耗尽 | 可归类为 Failed |
 
-在实际系统中，`运行循环` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+取消应传播到正在执行的工具，但工具未必支持真正中断。对付款、发信等副作用，还需要幂等键和执行后对账。
 
-### 12.4 结束条件
+## 12.5 工具横向对比
 
-结束条件 是本章理解 `Agent 生命周期` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 层 | 工具 | 生命周期模型 | 持久化/恢复 | 适用 |
+|---|---|---|---|---|
+| Agent Runner | OpenAI Agents SDK | Runner 循环、tool、handoff、final output、max turns | Sessions/服务端状态；可集成 durable runner | OpenAI Agent 应用 |
+| 状态图 | LangGraph | node、edge、interrupt、checkpoint | 原生 checkpoint 与 resume | 状态复杂 Agent |
+| Agent Runtime | Google ADK | event loop、session、state、resume/cancel | Runtime 服务管理 | Google 生态 |
+| Durable Workflow | Temporal | Workflow、Activity、Event History | 确定性 replay | 长任务与关键副作用 |
+| Python Workflow | Prefect | flow run state、retry、timeout | 服务端跟踪状态 | 数据/业务流程 |
 
-在实际系统中，`结束条件` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+Agent Runner 管理模型循环，Workflow Engine 管理长期可靠执行。企业系统常将前者作为后者的一个 Activity，而不是二选一。
 
-### 12.5 失败路径
+## 12.6 业务案例：采购审批 Agent
 
-失败路径 是本章理解 `Agent 生命周期` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+采购 Agent 生成供应商建议后必须暂停，等待预算负责人批准。正确设计：
 
-在实际系统中，`失败路径` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+- `run_id` 与采购单 ID 关联；
+- 候选与证据在等待前落库；
+- 等待状态不占用 worker；
+- 审批事件包含 actor、decision、timestamp；
+- 恢复时重新检查权限和采购单版本；
+- 创建订单使用幂等键。
 
-## Python 示例
+如果只在内存里 `input()` 等待，进程重启后就无法安全恢复。
 
-本章配套示例见：
+## 12.7 Python MVP
+
+```text
+chapter12/
+├── example.py
+└── lifecycle_runtime/
+    ├── runtime.py
+    └── test_runtime.py
+```
+
+运行：
 
 ```bash
 python chapters/chapter12/example.py
+python -m unittest discover -s chapters/chapter12 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 建模合法转移、终态保护、step budget 与事件记录。生产实现需把事件与 checkpoint 写入持久化存储。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] Run、Turn、Step、Tool Call 均有稳定 ID
+- [ ] 状态转移由 Runtime 验证
+- [ ] 终止条件不依赖模型自述
+- [ ] 等待释放 worker 并持久化 checkpoint
+- [ ] 取消传播到下游，副作用具备幂等
+- [ ] 恢复时重新校验身份、版本和策略
+- [ ] terminal run 默认不可修改
 
 ## Summary
 
-Agent 生命周期描述了一个目标从进入系统到完成、失败或交还人工的全过程。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+生命周期把概率性的模型循环装进确定性的运行边界。没有生命周期，Planner、Memory 和 Tool 只是函数集合；有了生命周期，它们才组成可恢复、可审计的 Agent Runtime。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+本章对比的是不同抽象层。OpenAI Agents SDK 与 LangGraph偏 Agent orchestration；Temporal、Prefect 偏 durable workflow，不能仅按 API 数量横向评价。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] OpenAI Agents SDK, Running agents.
+https://openai.github.io/openai-agents-python/running_agents/
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] LangGraph, Persistence.
+https://docs.langchain.com/oss/python/langgraph/persistence
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Temporal, Workflows.
+https://docs.temporal.io/workflows
+
+[4] Prefect, Flows.
+https://docs.prefect.io/v3/concepts/flows
+
+以上 URL 已在 2026-07-31 核对。

@@ -1,25 +1,21 @@
-"""Chapter 15: Tool
+"""Chapter 15: route a task to the safest matching tool."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from tool_runtime import ToolDefinition, ToolRegistry
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['Tool Registry', 'Tool Selection', 'Tool Routing', 'Tool Result']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition("sales_summary", ("sales", "read"), ("sales:read",), 2, True),
+        lambda region: {"region": region, "revenue": 218000},
+    )
+    registry.register(
+        ToolDefinition("raw_sql", ("sales", "sql"), ("admin:sql",), 9, True),
+        lambda region: {"region": region},
+    )
+    tool = registry.route({"sales", "read"}, scopes={"sales:read"}, require_read_only=True)
+    print(tool.name, registry.call(tool.name, {"region": "east"}, {"sales:read"}))
 
 
 if __name__ == "__main__":
-    result = run("demo goal for Tool")
-    print(result)
+    main()

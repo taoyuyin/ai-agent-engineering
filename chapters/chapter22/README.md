@@ -1,4 +1,4 @@
-# Chapter 22 Multi-Agent
+# Chapter 22 Multi-Agent：何时需要多个 Agent 协作
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,165 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Multi-Agent` 在 AI Agent Engineering 中到底解决什么问题？
+多个 Agent 是否天然优于单 Agent？如何设计通信、委派、权限、共享状态、冲突解决和终止条件？
 
 ## Chapter Conclusion
 
-Multi-Agent 通过通信和任务委派，把复杂目标拆给多个专业 Agent 协作完成。
+Multi-Agent 的价值来自能力边界、上下文隔离、并行和组织责任，而不是角色数量。没有明确委派契约和预算，多个 Agent 只会放大延迟、成本和错误传播。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 判断何时应使用单 Agent、agent-as-tool、handoff 或 team
+- 设计 Agent Card 与 Task Envelope
+- 实施最小权限 delegation 和 evidence contract
+- 比较 OpenAI、LangGraph、Google ADK、AutoGen、CrewAI
+- 运行 capability-scoped Coordinator MVP
 
-- Agent Communication
-- Task Delegation
-- 角色分工
-- 冲突
-- 一致性
+## 22.1 先问：为什么不能用一个 Agent
 
-## 本章定位
+需要 Multi-Agent 的合理信号：
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+- 不同领域需要隔离 Prompt、工具和数据权限；
+- 子任务可安全并行；
+- 一个 Agent 的工具集合过大；
+- 责任需要独立审计；
+- 子任务有明确输入输出；
+- 不同模型/成本策略适合不同角色。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+“模仿公司里的五个职位”不是充分理由。
 
-## 主要内容
+## 22.2 四种协作模式
 
-### 22.1 Agent Communication
+| 模式 | 控制权 | 适用 |
+|---|---|---|
+| Router → Specialist | Router | 领域分流 |
+| Agent as Tool | 调用方保留 | 有界子任务 |
+| Handoff | 接收方接管 | 对话责任转移 |
+| Supervisor/Team | 协调者 | 多步骤协作与汇总 |
 
-Agent Communication 是本章理解 `Multi-Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+优先从 agent-as-tool 开始，因为调用者保留 Goal 和终止权。Handoff 需要明确传递哪些历史、权限和未完成责任。
 
-在实际系统中，`Agent Communication` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 22.3 Agent Card
 
-### 22.2 Task Delegation
+Agent 能力不应只由名字描述：
 
-Task Delegation 是本章理解 `Multi-Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+```json
+{
+  "agent_id": "sales-analyst",
+  "capabilities": ["sales", "analysis"],
+  "accepted_input": "SalesAnalysisTask/v1",
+  "output": "EvidenceReport/v1",
+  "required_scopes": ["sales:read"],
+  "max_cost": 1.0
+}
+```
 
-在实际系统中，`Task Delegation` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+Card 是发现契约，不是权限授予。
 
-### 22.3 角色分工
+## 22.4 Task Delegation
 
-角色分工 是本章理解 `Multi-Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+Task Envelope 应包含：
 
-在实际系统中，`角色分工` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+- task_id / parent_run_id；
+- objective 与 success criteria；
+- 输入引用，不复制全部父 Context；
+- delegated scopes；
+- budget 与 deadline；
+- output schema；
+- evidence requirement；
+- cancellation token。
 
-### 22.4 冲突
+子 Agent 只能获得完成子任务所需的最小 scope，不能继承协调者全部凭证。
 
-冲突 是本章理解 `Multi-Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 22.5 通信与共享状态
 
-在实际系统中，`冲突` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+共享全部对话会造成 Context 污染和权限泄漏。更推荐：
 
-### 22.5 一致性
+- 结构化消息；
+- 引用对象存储中的 artifact；
+- append-only event；
+- 父子 task lineage；
+- 每个子 Agent 独立 scratchpad；
+- 只将验证后的输出合并到父状态。
 
-一致性 是本章理解 `Multi-Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+子 Agent 的自然语言结论不能自动成为事实。
 
-在实际系统中，`一致性` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 22.6 冲突解决
 
-## Python 示例
+多个 Agent 给出不同答案时：
 
-本章配套示例见：
+1. 比较证据来源和新鲜度；
+2. 检查指标定义和范围；
+3. 使用确定性 verifier；
+4. 必要时追加独立查询；
+5. 无法解决时保留分歧并交给人。
+
+多数投票可能让多个同源 Agent 一起犯错。置信度也必须校准。
+
+## 22.7 框架横向对比
+
+| 框架 | 主要模式 | 状态/通信 | 优点 | 注意点 |
+|---|---|---|---|---|
+| OpenAI Agents SDK | handoff、agent-as-tool | Runner/session/trace | 模式直接、trace 完整 | 定义交接历史和权限 |
+| LangGraph | subgraph、supervisor、tool call | typed state/checkpoint | 控制与恢复强 | subgraph 持久策略需选择 |
+| Google ADK | agent team、workflow/graph | session state/events | workflow 与 agent 组合 | ADK 2.0 能力演进快 |
+| AutoGen AgentChat | agents、teams、group chat | message/team runtime | 协作模式丰富 | 控制对话终止和成本 |
+| CrewAI | agents、tasks、crews/flows | role/task/process | 业务抽象直观 | 避免角色 Prompt 代替契约 |
+
+框架 API 不会自动解决跨 Agent 权限与证据一致性。
+
+## 22.8 A2A 与 MCP
+
+- MCP：AI Host 连接工具、资源和 Prompt Server；
+- A2A：独立 Agent/服务之间交换任务和结果；
+- 内部函数调用：同一 Runtime 内的最低开销委派。
+
+进程内子 Agent 不必为了“标准化”强行使用网络协议。跨团队、跨平台和远程 Agent 才更需要 A2A 类协议。
+
+## 22.9 业务案例：经营分析团队
+
+Coordinator 将同一数据 snapshot 下的子任务交给 Sales、Inventory、Service Agent。每个 Agent 只访问本领域数据，返回 `EvidenceReport`。合并器检查时间窗口和指标定义一致，再生成综合结论。发布仍由确定性 Workflow 和管理者审批。
+
+## 22.10 Python MVP
 
 ```bash
 python chapters/chapter22/example.py
+python -m unittest discover -s chapters/chapter22 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 使用 AgentCard、capability/scope 匹配、委派预算和 evidence contract；没有合适权限的 Agent 时 fail closed。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] 每增加一个 Agent 都有明确理由
+- [ ] Agent Card 与 Task Envelope 版本化
+- [ ] delegation 采用最小 scope
+- [ ] 子 Agent 有 budget、deadline 和 cancellation
+- [ ] 父子 Run/Task lineage 可追踪
+- [ ] 只合并验证后的输出
+- [ ] 冲突按证据解决，不盲目投票
+- [ ] 防止 delegation loop 和无限对话
 
 ## Summary
 
-Multi-Agent 通过通信和任务委派，把复杂目标拆给多个专业 Agent 协作完成。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Multi-Agent 是组织复杂度工具，不是智能倍增器。先把单 Agent contract 做清楚，再通过有界委派组合专业能力。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+Google ADK 文档已迁移至 `adk.dev`，且 ADK 2.0 引入更灵活的 graph/dynamic workflow；教程引用当前官方地址。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] OpenAI Agents SDK, Handoffs.
+https://openai.github.io/openai-agents-python/handoffs/
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] LangGraph, Subgraphs.
+https://docs.langchain.com/oss/python/langgraph/use-subgraphs
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Google ADK, Multi-agent systems.
+https://adk.dev/workflows/
+
+[4] AutoGen AgentChat.
+https://microsoft.github.io/autogen/stable/user-guide/agentchat-user-guide/tutorial/index.html
+
+以上 URL 已在 2026-07-31 核对。

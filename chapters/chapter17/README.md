@@ -1,4 +1,4 @@
-# Chapter 17 Context Engineering
+# Chapter 17 Context Engineering：为每一步构建最小充分信息集
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,96 +8,159 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Context Engineering` 在 AI Agent Engineering 中到底解决什么问题？
+Chapter 8 已解释 Context 原理。本章进一步回答：Agent Runtime 如何在每一个 Step 动态选择、隔离、压缩和验证上下文？
 
 ## Chapter Conclusion
 
-Context Engineering 是把目标、记忆、工具结果和约束组织成模型可用上下文的工程能力。
+Context Engineering 是 Runtime 的编译阶段：它把 Goal、Policy、Plan、Memory、Knowledge、Tool schema 和 Observation 编译成模型本次决策的最小充分工作集。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 设计按 section 分区的 Context Policy
+- 区分 instruction、trusted fact 与 untrusted data
+- 管理工具 schema、历史和证据预算
+- 比较供应商缓存与框架状态能力
+- 运行 section quota Context MVP
 
-- Context Assembly
-- Context Compression
-- Context Window 管理
-- Prompt
-- Memory
-- Tool Result
+## 17.1 从 Prompt 拼接到 Context Compiler
 
-## 本章定位
+```text
+Runtime State
+├── Goal / Success Criteria
+├── Policy / Identity
+├── Current Plan Step
+├── Relevant Memory
+├── Retrieved Knowledge
+├── Available Tools
+└── Recent Observations
+          ↓
+Context Compiler
+  normalize → authorize → rank → budget → render
+          ↓
+Model Request + Context Manifest
+```
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+Context Manifest 应记录输入来源、版本、token、选择原因和丢弃原因，使一次模型决策可以复现。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+## 17.2 Context Sections
 
-## 主要内容
+推荐分区：
 
-### 17.1 Context Assembly
+| Section | 信任级别 | 是否必需 | 超预算策略 |
+|---|---|---:|---|
+| System Policy | instruction | 是 | 失败/切换窗口 |
+| Goal | instruction/data contract | 是 | 失败 |
+| Current Step | instruction | 是 | 失败 |
+| Tool Schema | capability contract | 按需 | 延迟加载 |
+| Evidence | trusted/untrusted data | 按需 | rerank/摘要 |
+| Memory | data | 可选 | top-k/压缩 |
+| History | data | 可选 | 截断/摘要 |
 
-Context Assembly 是本章理解 `Context Engineering` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+不要让外部网页、邮件或工具文本与 System Policy 处于同一指令区。
 
-在实际系统中，`Context Assembly` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 17.3 Budget 不只是总 token
 
-### 17.2 Context Compression
+只设总预算会让某一类内容挤占全部空间。分区预算可以保证：
 
-Context Compression 是本章理解 `Context Engineering` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- policy 和 goal 永远存在；
+- evidence 获得足够空间；
+- history 不会无限增长；
+- 工具 schema 按当前 capability 加载；
+- 输出空间提前预留。
 
-在实际系统中，`Context Compression` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+预算还要考虑多模态输入、reasoning token 与工具返回上限。
 
-### 17.3 Context Window 管理
+## 17.4 Compression 策略
 
-Context Window 管理 是本章理解 `Context Engineering` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 策略 | 优点 | 风险 |
+|---|---|---|
+| Truncate | 快、确定 | 丢失关键尾部/中部 |
+| Extract facts | 信息密度高 | 抽取错误 |
+| Summarize | 适合历史 | 数字和例外丢失 |
+| Retrieve on demand | 节省窗口 | 多一次延迟 |
+| Hierarchical summary | 可处理长任务 | 误差逐层累积 |
 
-在实际系统中，`Context Window 管理` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+高风险证据应保留原文引用和 hash。摘要不能成为唯一审计记录。
 
-### 17.4 Prompt
+## 17.5 工具能力横向对比
 
-Prompt 是本章理解 `Context Engineering` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 层 | 工具 | 主要能力 | 不解决 |
+|---|---|---|---|
+| Provider | OpenAI conversation state / prompt caching | 多轮状态、前缀复用 | 业务优先级 |
+| Provider | Anthropic context editing / caching | 清理旧工具结果、缓存 | 长期 Memory 治理 |
+| Provider | Gemini long context / context caching | 大内容与缓存 | 任务相关性 |
+| Runtime | LangGraph state/checkpoint/store | 状态持久化与恢复 | 自动预算策略 |
+| Knowledge | LlamaIndex retriever/reranker | 知识选择 | Goal/Policy 组装 |
+| 自研 | Context Compiler | 业务分区、权限、溯源 | 模型本身能力 |
 
-在实际系统中，`Prompt` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+Prompt Cache 优化计算，不减少 Context 占用；Checkpoint 保存状态，不代表所有状态都应发给模型。
 
-### 17.5 Memory
+## 17.6 Context Quality Evaluation
 
-Memory 是本章理解 `Context Engineering` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+至少测量：
 
-在实际系统中，`Memory` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+- required fact inclusion rate；
+- evidence precision/recall；
+- conflicting fact rate；
+- token utilization；
+- prompt injection resistance；
+- 压缩前后任务正确率；
+- 不同位置的事实利用率；
+- 工具数量增加后的选择准确率。
 
-## Python 示例
+Context 评估集应保存“必须包含”和“必须排除”的信息。
 
-本章配套示例见：
+## 17.7 业务案例：企业知识 Agent
+
+用户询问报销制度时：
+
+1. Goal 与员工地区来自可信身份；
+2. 检索当前生效政策；
+3. 旧版本只用于冲突说明，不与新版本等权；
+4. 网页内容作为不可信证据；
+5. 输出引用条款、版本和生效日；
+6. 若地区或政策版本无法确认，停止给确定结论。
+
+## 17.8 Python MVP
 
 ```bash
 python chapters/chapter17/example.py
+python -m unittest discover -s chapters/chapter17 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 在总预算上增加 section quota，按优先级选择内容，并在渲染时保留 trusted/untrusted 边界及丢弃原因。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] 每次模型请求生成 Context Manifest
+- [ ] Policy、Goal、Step 使用独立必需区
+- [ ] 外部内容永远标记为 data
+- [ ] 总预算之外设置 section quota
+- [ ] 工具 schema 按需发现和加载
+- [ ] 摘要保留原文引用
+- [ ] 记录 token、选择与丢弃原因
+- [ ] 用注入、冲突和长上下文集评估
 
 ## Summary
 
-Context Engineering 是把目标、记忆、工具结果和约束组织成模型可用上下文的工程能力。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Context Engineering 决定模型在某一步能知道什么、能忽略什么、会信任什么。它是 Agent Runtime 的核心编译器，而不是 Prompt 模板管理的别名。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+Chapter 8 关注模型上下文原理；本章关注多步 Agent 中 Context 与 Runtime State 的工程边界。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] LangGraph, Context concepts.
+https://docs.langchain.com/oss/python/concepts/context
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] Anthropic, Context windows.
+https://platform.claude.com/docs/en/build-with-claude/context-windows
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Google, Context caching.
+https://ai.google.dev/gemini-api/docs/caching
+
+[4] OpenAI, Conversation state.
+https://developers.openai.com/api/docs/guides/conversation-state
+
+以上 URL 已在 2026-07-31 核对。

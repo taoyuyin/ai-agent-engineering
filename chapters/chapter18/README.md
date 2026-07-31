@@ -1,4 +1,4 @@
-# Chapter 18 Observation
+# Chapter 18 Observation：把工具返回转换成可用证据
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,157 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Observation` 在 AI Agent Engineering 中到底解决什么问题？
+Tool Result 为什么不能直接追加到 Prompt？Runtime 如何处理错误、超长结果、来源、敏感数据和 Prompt Injection？
 
 ## Chapter Conclusion
 
-Observation 是工具执行结果进入 Agent 决策循环的形式。
+Observation 是 Agent 对外部执行结果的标准化认识，不等于原始返回。Observation Adapter 负责校验、分类、裁剪、脱敏、标注来源和建立信任边界。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 区分 Tool Result、Observation 与 Evidence
+- 设计统一 Observation schema
+- 分类 transient、validation、permission 和 business error
+- 处理结果大小、敏感数据与不可信指令
+- 运行 ToolResult → Observation MVP
 
-- Tool Result
-- Observation
-- 状态更新
-- 证据质量
-- 下一步决策
+## 18.1 三层对象
 
-## 本章定位
+```text
+Tool Result
+  raw provider/function response
+          ↓ normalize
+Observation
+  status + summary + provenance + trust + retryability
+          ↓ verify
+Evidence
+  supports a Goal criterion or decision
+```
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+工具成功返回只说明调用完成，不说明数据正确，更不说明它支持最终结论。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+## 18.2 Observation Contract
 
-## 主要内容
+建议字段：
 
-### 18.1 Tool Result
+```json
+{
+  "call_id": "call-17",
+  "step_id": "query-revenue",
+  "status": "success",
+  "content": {"revenue": 218000},
+  "source": "warehouse.sales_monthly",
+  "observed_at": "2026-07-31T10:00:00Z",
+  "schema_version": "1",
+  "trusted_as_instruction": false,
+  "retryable": false
+}
+```
 
-Tool Result 是本章理解 `Observation` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+`trusted_as_instruction` 对外部数据必须为 false。即使数据库返回“忽略上面的规则”，它也只是数据。
 
-在实际系统中，`Tool Result` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 18.3 Error Taxonomy
 
-### 18.2 Observation
+| 错误 | 示例 | 默认动作 |
+|---|---|---|
+| Transient | timeout、rate limit、503 | 有界退避重试 |
+| Validation | 参数/schema 不合法 | 修复参数 |
+| Permission | scope/tenant 被拒绝 | 终止或人工授权 |
+| Not Found | 资源不存在 | 澄清或换路径 |
+| Business | 订单已退款 | 更新计划，不盲重试 |
+| Quality | 数据过期、样本不足 | 获取新证据 |
 
-Observation 是本章理解 `Observation` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+错误 taxonomy 应来自 Runtime，不让模型通过错误文本猜测。
 
-在实际系统中，`Observation` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 18.4 结果大小与 Context
 
-### 18.3 状态更新
+工具可能返回百万行、二进制文件或完整日志。Adapter 应：
 
-状态更新 是本章理解 `Observation` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- 设置 byte/row/token 上限；
+- 大结果落对象存储，只返回 handle 与摘要；
+- 对表格保留 schema、采样与统计；
+- 对日志保留关键窗口和检索接口；
+- 记录 truncation，禁止静默截断；
+- 将完整内容与模型 Context 解耦。
 
-在实际系统中，`状态更新` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 18.5 安全边界
 
-### 18.4 证据质量
+Observation 处理至少包括：
 
-证据质量 是本章理解 `Observation` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- PII/secret 检测与脱敏；
+- source allowlist 与 provenance；
+- HTML/Markdown 中外链和脚本清理；
+- Prompt Injection 标记；
+- 文件 MIME/type 检查；
+- 结果 schema 与业务不变量；
+- 错误信息去除内部栈和凭证。
 
-在实际系统中，`证据质量` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+Prompt 提醒只是纵深防御，不能替代这些确定性控制。
 
-### 18.5 下一步决策
+## 18.6 工具/协议结果对比
 
-下一步决策 是本章理解 `Observation` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+| 来源 | 原始结果形态 | Runtime 关注点 |
+|---|---|---|
+| OpenAI function tool | tool output 与 call id | 关联调用、错误、敏感 trace |
+| Anthropic tool use | tool_result content block | block 顺序、错误标记、大小 |
+| Gemini function calling | function response | 调用关联与 SDK 自动循环 |
+| MCP | content array / structured content | content type、server trust、schema |
+| LangGraph ToolNode | ToolMessage / state update | error handling、state merge |
+| REST/gRPC | status/body/metadata | HTTP/RPC 错误与重试语义 |
 
-在实际系统中，`下一步决策` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+统一 Observation 可以把供应商细节隔离在 Adapter 层。
 
-## Python 示例
+## 18.7 业务案例：SQL Agent
 
-本章配套示例见：
+SQL 执行结果不能直接送给模型。Adapter 应附加：
+
+- 实际执行的 query hash；
+- 数据源与 snapshot 时间；
+- row count 和 truncation；
+- 列类型与敏感等级；
+- 查询耗时和扫描量；
+- 只读策略验证结果；
+- 结果样本或存储 handle。
+
+最终报告引用 Observation ID，而不是复制无法追溯的数字。
+
+## 18.8 Python MVP
 
 ```bash
 python chapters/chapter18/example.py
+python -m unittest discover -s chapters/chapter18 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 实现统一状态、来源、长度限制、外部数据非指令标记和 retryable error 分类。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] 原始结果与 Observation 分层保存
+- [ ] Observation 关联 run/step/call ID
+- [ ] 结果有 schema、source、time 和 version
+- [ ] 大结果落存储，不直接进 Context
+- [ ] 外部内容永远不提升为 instruction
+- [ ] 错误使用稳定 reason code
+- [ ] 脱敏后才进入模型和 trace
+- [ ] Evidence 必须通过独立验证
 
 ## Summary
 
-Observation 是工具执行结果进入 Agent 决策循环的形式。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Observation Adapter 是外部世界进入 Agent 的数据防火墙。它决定模型看到的是可控证据，还是未经处理的噪声和攻击载荷。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+不同供应商对 Tool Result 的消息结构不同，本章的 Observation 是应用内部统一契约，不是外部协议标准。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] MCP, Tools.
+https://modelcontextprotocol.io/specification/2026-07-28/server/tools
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] LangChain, Tools.
+https://docs.langchain.com/oss/python/langchain/tools
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] OpenAI Agents SDK, Tracing.
+https://openai.github.io/openai-agents-python/tracing/
+
+以上 URL 已在 2026-07-31 核对。

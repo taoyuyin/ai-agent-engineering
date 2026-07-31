@@ -1,25 +1,16 @@
-"""Chapter 20: State Machine
+"""Chapter 20: rebuild Agent state by replaying immutable events."""
 
-Minimal runtime-oriented sketch.
-"""
-
-from dataclasses import dataclass, field
-from typing import List
+from state_machine_runtime import AgentStateMachine, EventStore
 
 
-@dataclass
-class AgentState:
-    goal: str
-    events: List[str] = field(default_factory=list)
-
-
-def run(goal: str) -> AgentState:
-    state = AgentState(goal=goal)
-    for step in ['状态', '事件', '转移', '终止状态']:
-        state.events.append(f"handle: {step}")
-    return state
+def main() -> None:
+    store = EventStore()
+    machine = AgentStateMachine(store)
+    for event in ("goal_validated", "plan_created", "tool_requested", "tool_succeeded", "completed"):
+        machine.apply("run-42", event)
+    print(machine.rebuild("run-42"))
+    print(store.events("run-42"))
 
 
 if __name__ == "__main__":
-    result = run("demo goal for State Machine")
-    print(result)
+    main()

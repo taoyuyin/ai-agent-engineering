@@ -1,4 +1,4 @@
-# Chapter 16 Memory
+# Chapter 16 Memory：让 Agent 跨步骤和会话保留有效信息
 
 Part III Agent Architecture —— Agent 内部如何工作
 
@@ -8,95 +8,154 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Memory` 在 AI Agent Engineering 中到底解决什么问题？
+Conversation History、Checkpoint、向量检索和 Long-term Memory 有什么区别？Agent 应该记住什么，又必须忘记什么？
 
 ## Chapter Conclusion
 
-Memory 让 Agent 能够管理当前任务状态和跨任务知识。
+Memory 是受策略控制的读写系统，不是无限增长的聊天记录。可靠 Memory 必须定义类型、写入条件、命名空间、检索、更新、冲突、过期和删除。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 区分 Working、Episodic、Semantic、Procedural Memory
+- 区分 thread checkpoint 与跨 thread store
+- 设计 tenant/subject namespace 和更新版本
+- 比较框架 Memory 与存储实现
+- 运行一个隔离、检索、更新和遗忘 MVP
 
-- Working Memory
-- Long-term Memory
-- Memory Update
-- Memory Retrieval
-- 记忆污染
+## 16.1 Memory 分类
 
-## 本章定位
+| 类型 | 保存内容 | 生命周期 | 示例 |
+|---|---|---|---|
+| Working | 当前 Run 中间状态 | step/run | 当前计划与观察 |
+| Episodic | 发生过的事件 | 跨 run | 上次退款失败 |
+| Semantic | 稳定事实与偏好 | 长期 | 用户偏好中文报告 |
+| Procedural | 可复用流程知识 | 长期、版本化 | 月报生成步骤 |
 
-本章属于 `Part III Agent Architecture`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+Context 是“本次可见什么”，Memory 是“可供未来取回什么”。Memory 只有被检索并组装进 Context 后才影响模型。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+## 16.2 Memory Pipeline
 
-## 主要内容
+```text
+Candidate Event
+  ↓ Write Policy
+Extract / Normalize / Classify
+  ↓
+Tenant + Subject Namespace
+  ↓
+Store + Version + TTL
+  ↓
+Retrieve → Rank → Validate
+  ↓
+Context Assembler
+```
 
-### 16.1 Working Memory
+不是每条对话都值得长期保存。写入策略应考虑稳定性、未来价值、敏感性、置信度和用户同意。
 
-Working Memory 是本章理解 `Memory` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 16.3 写入、更新与冲突
 
-在实际系统中，`Working Memory` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+“用户喜欢简洁报告”可能后来变成“审计报告需要完整细节”。Memory 应：
 
-### 16.2 Long-term Memory
+- 保存来源和时间；
+- 使用稳定 key 更新，不无限追加同一事实；
+- 保留版本或 supersedes 关系；
+- 对冲突事实按来源、时效和置信度处理；
+- 低置信推断不得伪装为用户声明。
 
-Long-term Memory 是本章理解 `Memory` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 16.4 Retrieval
 
-在实际系统中，`Long-term Memory` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+Memory Retrieval 不只做向量相似度。常见评分：
 
-### 16.3 Memory Update
+```text
+score =
+semantic_similarity
++ recency
++ importance
++ source_trust
++ task_relevance
+- conflict_penalty
+```
 
-Memory Update 是本章理解 `Memory` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+权限过滤必须发生在检索期间，而不是拿到结果后再删除，否则可能产生侧信道和日志泄漏。
 
-在实际系统中，`Memory Update` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 16.5 工具横向对比
 
-### 16.4 Memory Retrieval
+| 工具/层 | Thread State | Cross-thread Memory | 持久化实现 | 适用 |
+|---|---:|---:|---|---|
+| OpenAI Agents SDK Sessions | 是 | 由应用设计 | SQLite/custom/session backend | 会话历史 |
+| LangGraph Checkpointer | 是 | 否 | memory/SQLite/Postgres 等 | checkpoint、resume |
+| LangGraph Store | 可 | 是 | InMemory/Postgres/Redis 等 | 用户长期记忆 |
+| Google ADK Session/State/Memory | 是 | 是 | Runtime service | ADK Agent |
+| Vector DB | 否 | 是 | 专用向量索引 | 语义检索 |
+| Relational DB | 是 | 是 | SQL/事务 | 事实、版本、审计 |
 
-Memory Retrieval 是本章理解 `Memory` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+向量数据库适合召回，不适合单独承担强一致版本、删除证明和事务。企业 Memory 常组合 SQL 元数据与向量索引。
 
-在实际系统中，`Memory Retrieval` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 16.6 安全与隐私
 
-### 16.5 记忆污染
+Memory 是高风险数据面：
 
-记忆污染 是本章理解 `Memory` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- 跨租户泄漏；
+- 保存敏感信息和秘密；
+- 错误事实长期污染；
+- 用户无法删除；
+- 恶意输入被提升为程序性记忆。
 
-在实际系统中，`记忆污染` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+最低要求是 tenant/subject namespace、数据分类、TTL、加密、访问审计和删除接口。Tool Result 中的指令不应自动写成 Procedural Memory。
 
-## Python 示例
+## 16.7 业务案例：客户服务 Agent
 
-本章配套示例见：
+可保存：
+
+- 客户明确选择的语言；
+- 已验证产品版本；
+- 未解决工单 ID；
+- 经确认的沟通偏好。
+
+不应保存：
+
+- 一次性验证码；
+- 支付卡信息；
+- 模型猜测的情绪标签；
+- 未经确认的医疗/法律敏感推断；
+- 已关闭工单的完整长对话（除非合规要求）。
+
+## 16.8 Python MVP
 
 ```bash
 python chapters/chapter16/example.py
+python -m unittest discover -s chapters/chapter16 -p "test_*.py"
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+MVP 实现 memory type、tenant/subject namespace、置信度、版本更新、词项检索和 forget。生产系统需加入持久化、向量召回、TTL、加密和 deletion audit。
 
-## Engineering Notes
+## Production Checklist
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+- [ ] 定义 Memory 类型和写入策略
+- [ ] tenant、subject、purpose 多层隔离
+- [ ] 保存来源、时间、置信度和版本
+- [ ] 检索阶段执行权限过滤
+- [ ] 冲突和过期有明确规则
+- [ ] 用户可查看、更正和删除
+- [ ] 不保存 secrets 与无依据敏感推断
+- [ ] 评估 recall、污染率和跨租户隔离
 
 ## Summary
 
-Memory 让 Agent 能够管理当前任务状态和跨任务知识。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+好的 Memory 不追求“什么都记住”，而追求在正确权限下保存少量稳定、有用、可纠正的信息。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+本章的 Store 是教学实现，不使用 Embedding。向量数据库选型与 Python API 已在 Chapter 7 展开。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] LangGraph, Persistence and Store.
+https://docs.langchain.com/oss/python/langgraph/persistence
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] OpenAI Agents SDK, Sessions.
+https://openai.github.io/openai-agents-python/sessions/
 
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Google ADK, Sessions.
+https://adk.dev/sessions/
+
+以上 URL 已在 2026-07-31 核对。
