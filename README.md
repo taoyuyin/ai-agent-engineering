@@ -35,6 +35,9 @@ ai-agent-engineering/
 
 - [写作规范](docs/writing-guidelines.md)
 - [项目路线图](docs/roadmap.md)
+- [Agent Runtime 工程说明](framework/README.md)
+- [Agent Runtime 架构](framework/ARCHITECTURE.md)
+- [SQL Agent 完整案例](examples/sql-agent/README.md)
 
 ## 全文章节
 
@@ -120,18 +123,32 @@ ai-agent-engineering/
 当前仓库以 Python 为主要示例语言。
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
+python -m pip install -r requirements.txt
+python -m pip install -e .
 ```
 
-运行第一章示例：
+运行 Agent Runtime 的第一个端到端案例：
 
 ```bash
-python chapters/chapter01/minimal_agent.py
+python examples/sql-agent/main.py "查询 2025 年各区域净销售额" --show-trace
 ```
 
-运行任意章节示例：
+启动 API：
+
+```bash
+uvicorn sql_agent.api:app --app-dir examples/sql-agent --port 8080
+```
+
+使用 Docker：
+
+```bash
+docker compose -f examples/sql-agent/docker-compose.yml up --build
+```
+
+运行任意章节的独立 MVP：
 
 ```bash
 python chapters/chapter05/example.py
@@ -148,6 +165,8 @@ OpenAI Agents SDK / LangGraph / Google ADK / CrewAI / AutoGen / Dify
 ```
 
 先理解并实现 Agent Runtime，再学习成熟框架为什么这样设计。
+
+当前 `framework/ v0.1.0` 已提供 Goal、Plan、Tool、Policy、Executor、Memory、State Machine、Trace 和 Evidence 的统一契约。`examples/sql-agent/` 展示这些能力如何组合成一条可运行、可服务化、可容器化的企业案例。
 
 ## License
 

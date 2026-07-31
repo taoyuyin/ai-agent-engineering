@@ -40,6 +40,27 @@ Part VI   Enterprise Practice  企业实践
 Part VII  Future               下一代软件
 ```
 
+## 工程贯通里程碑
+
+章节源码用于解释单一能力，根目录工程用于验证这些能力能否组合：
+
+```text
+Chapter 12–23  Agent Architecture MVP
+        ↓
+framework/     Agent Runtime v0.1
+        ↓
+Chapter 24–33  Production Engineering
+        ↓
+examples/      企业场景端到端实现
+```
+
+当前第一条纵向主线：
+
+- `framework/`：Goal、Plan、Tool、Policy、Executor、Memory、Workflow、Trace、Evidence；
+- `examples/sql-agent/`：Schema Discovery、只读 SQL、权限、Evidence、FastAPI、Docker；
+- Chapter 23：解释统一 Runtime 架构；
+- Chapter 42：从 SQL Agent MVP 演进到生产级 Text-to-SQL。
+
 ## Part I Foundations —— 为什么需要 AI Agent
 
 目标：建立世界观，理解 Agent 出现的历史背景。
@@ -305,6 +326,8 @@ Part III 不重复 Part II 的底层原理，而是回答这些能力如何进�
 
 输出：从组件到系统的完整 Agent Architecture。
 
+配套工程输出：`framework/ Agent Runtime v0.1`。各章的局部 MVP 在这里被组合为统一运行时，后续企业案例复用同一套契约。
+
 ## Part IV Agent Engineering —— 如何构建企业级 Agent
 
 目标：Production Ready。
@@ -460,6 +483,8 @@ Part III 不重复 Part II 的底层原理，而是回答这些能力如何进�
 ### Chapter 42 SQL Agent
 
 面向结构化数据查询的 Agent。
+
+配套工程输出：`examples/sql-agent/`。第一阶段使用离线可运行的确定性 Planner 验证 Runtime、安全与证据链，后续再接入 Model Gateway、Semantic Layer、SQL AST 与生产数据库权限。
 
 ### Chapter 43 Data Agent
 

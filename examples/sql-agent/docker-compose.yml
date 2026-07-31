@@ -1,0 +1,20 @@
+services:
+  sql-agent:
+    build:
+      context: ../..
+      dockerfile: examples/sql-agent/Dockerfile
+    environment:
+      AGENT_ENV: production
+      SQL_AGENT_DATABASE: /app/var/sql-agent.db
+      AGENT_MAX_STEPS: "8"
+      AGENT_MAX_RETRIES: "1"
+    ports:
+      - "8080:8080"
+    volumes:
+      - sql-agent-data:/app/var
+    read_only: true
+    tmpfs:
+      - /tmp
+
+volumes:
+  sql-agent-data:

@@ -64,13 +64,17 @@ SQL 生成 是本章理解 `SQL Agent` 的关键入口。这里关注的不是�
 
 ## Python 示例
 
-本章配套示例见：
+本章的 `example.py` 保留概念入口。完整工程实现见：
 
 ```bash
-python chapters/chapter42/example.py
+python -m pip install -r requirements.txt
+python -m pip install -e .
+python examples/sql-agent/main.py "查询 2025 年各区域净销售额" --show-trace
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+完整案例位于 [`examples/sql-agent/`](../../examples/sql-agent/README.md)，并复用根目录 [`framework/`](../../framework/README.md) Agent Runtime。它包含 Schema Tool、参数化 SQL、Scope、只读 Guardrail、Observation、Evidence、Trace、FastAPI、Docker Compose 和配套数据集。
+
+确定性 Planner 使案例可以离线运行；后续本章将以同一验收数据集增加 Model Gateway、Semantic Layer、SQL AST、PostgreSQL 行列权限和 Text-to-SQL Evaluation。
 
 ## Engineering Notes
 

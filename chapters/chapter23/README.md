@@ -217,6 +217,12 @@ MVP 是 composition root：`AgentRequest` 携带 tenant/actor/scope，PolicyEnfo
 
 Part III 最终建立的是一个可控制的智能执行系统：Goal 定义成功，Planner 组织工作，Tool 连接外部世界，Memory 与 Context 提供信息，Observation 与 Reflection 闭环反馈，State Machine 与 Workflow 保证可靠，Multi-Agent 扩展专业能力，Governance 贯穿全程。
 
+## 从章节 MVP 到统一 Runtime
+
+本章 `enterprise_runtime` 用最小代码展示架构组合关系。仓库根目录的 [`framework/`](../../framework/README.md) 是进一步工程化后的统一实现，提供稳定契约、Planner 扩展点、Tool Registry、Policy、Executor、Memory、State Machine、Trace 和 Evidence。
+
+第一条端到端验证链路见 [`examples/sql-agent/`](../../examples/sql-agent/README.md)。它展示同一 Runtime 如何承载 Schema 发现、只读 SQL、Scope 授权、查询证据、FastAPI 和 Docker 部署。
+
 ## Notes
 
 本章架构是厂商中立的参考模型。具体项目可以合并组件，但不能删除其责任；例如把 Tool Gateway 写在 Runtime 进程内，仍必须保留独立授权边界。

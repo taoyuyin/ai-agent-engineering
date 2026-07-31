@@ -33,3 +33,7 @@ tmp/
 # Data
 datasets/raw/
 datasets/private/
+var/
+*.db
+*.db-shm
+*.db-wal
