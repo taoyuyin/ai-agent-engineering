@@ -51,6 +51,19 @@
 
 ## Part V Frameworks —— 主流 Agent 框架设计
 
+本部分不按 API 罗列框架功能，而是用同一个“受治理的销售分析 Agent”基准，从运行时、状态、工具、结构化输出、权限、恢复和平台化能力进行横向比较。每章包含独立依赖、环境变量模板和 Python MVP。
+
+| Chapter | 核心抽象 | 最适合解决的问题 |
+| --- | --- | --- |
+| 34 OpenAI Agents SDK | Agent / Runner / Tool / Handoff | 以较少代码构建完整 Agent Loop |
+| 35 LangGraph | State / Node / Edge / Checkpoint | 显式状态、复杂分支、中断与恢复 |
+| 36 Google ADK | Agent / Runner / Session / Event | Google 生态中的模块化 Agent 应用 |
+| 37 CrewAI | Agent / Task / Crew / Flow | 角色与任务驱动的业务协作 |
+| 38 AutoGen | Message / Agent / Team / Runtime | 消息驱动的动态 Multi-Agent |
+| 39 PydanticAI | Agent / Dependencies / Output Type | 类型安全的 Python Agent 服务 |
+| 40 LlamaIndex | Index / Retriever / Query Engine / Agent | RAG 与数据密集型 Agent |
+| 41 Dify | App / Workflow / Knowledge / Plugin | 低代码 Agent 应用平台与交付 |
+
 - [Chapter 34 OpenAI Agents SDK](chapter34/README.md)
 - [Chapter 35 LangGraph](chapter35/README.md)
 - [Chapter 36 Google ADK](chapter36/README.md)
@@ -81,8 +94,11 @@
 
 ## 章节目录规范
 
-每章建议包含：
+每章至少包含：
 
 1. `README.md`：章节正文、结构、引用和工程说明
-2. `example.py`：最小 Python 示例
-3. 后续可增加 `with_*` 示例，引入一个关键工程能力
+2. `example.py`：可运行的最小 Python MVP
+3. `requirements.txt`：本章独立环境依赖
+4. `.env.example`：需要外部服务时提供环境变量模板
+
+平台型章节还应提供外部应用 Contract 和配置步骤，避免只保留无法复现的控制台截图。

@@ -6,101 +6,211 @@ Version: 2026-07
 
 Last Updated: 2026-07-31
 
-## Core Question
+## 本章结论
 
-本章要回答：`Google ADK` 在 AI Agent Engineering 中到底解决什么问题？
+Google Agent Development Kit（ADK）围绕 Agent、Runner、Session、Event、Tool 和 Service 建立模块化运行时。它既能用 LLM Agent 处理开放式推理，也能用 Sequential、Parallel、Loop 等 Workflow Agent 表达确定性编排。
 
-## Chapter Conclusion
+ADK 特别适合 Google Cloud、Gemini 和企业服务体系，但其设计并不只允许一种模型。真正的工程价值在于 Agent 定义与运行服务解耦，而不是某个模型 API。
 
-Google ADK 从 Agent 应用工程角度组织 Agent、Tool、Session 和 Runner。
+## 学习目标
 
-## Learning Objectives
+完成本章后，你应该能够：
 
-完成本章后，你应该能够理解：
+- 解释 ADK 的 Agent、Runner、Session、Event 与 Service；
+- 区分 LLM Agent、Workflow Agent 和 Custom Agent；
+- 使用普通 Python 函数注册 Function Tool；
+- 理解本地 `InMemoryRunner` 与生产 Runtime 的差异；
+- 评估 ADK 在 Google Cloud 体系中的优势与迁移成本。
 
-- Agent
-- Tool
-- Session
-- Runner
-- 部署
+## 36.1 Agent 定义与运行环境解耦
 
-## 本章定位
+一个 ADK 应用通常导出 `root_agent`。Agent 描述“它是谁、使用什么模型、有哪些工具”，Runner 负责“如何执行、会话放在哪里、事件如何流动”。
 
-本章属于 `Part V Frameworks`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+```text
+Application
+  └── root_agent
+      ├── model / instruction
+      ├── tools
+      └── sub_agents
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
-
-## 主要内容
-
-### 36.1 Agent
-
-Agent 是本章理解 `Google ADK` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Agent` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 36.2 Tool
-
-Tool 是本章理解 `Google ADK` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Tool` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 36.3 Session
-
-Session 是本章理解 `Google ADK` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Session` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 36.4 Runner
-
-Runner 是本章理解 `Google ADK` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Runner` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 36.5 部署
-
-部署 是本章理解 `Google ADK` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`部署` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-## Python 示例
-
-本章配套示例见：
-
-```bash
-python chapters/chapter36/example.py
+Runner
+  ├── Session Service
+  ├── Artifact Service
+  ├── Memory Service
+  └── Event stream
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+这种分离有利于把同一个 Agent 从开发环境迁移到服务运行环境。业务代码不应直接把会话、内存和部署细节写死在 Agent 定义中。
 
-## Engineering Notes
+## 36.2 三类 Agent
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+| 类型 | 控制方式 | 适用场景 |
+| --- | --- | --- |
+| LLM Agent | 模型根据指令和工具决定下一步 | 问答、分析、开放式任务 |
+| Workflow Agent | Sequential、Parallel、Loop 等确定性结构 | 固定阶段、并行收集、循环迭代 |
+| Custom Agent | 开发者实现自定义执行逻辑 | 特殊协议、领域运行时、复杂控制 |
+
+这三类可以组合。企业报告系统可以先用 `ParallelAgent` 并行获取销售、库存和风险数据，再由 LLM Agent 汇总；审批和发布仍由确定性 Workflow Agent 控制。
+
+## 36.3 Runner、Session 与 Event
+
+Runner 是 ADK 执行入口。一次运行不只是返回字符串，而是产生事件流。事件可能包含模型内容、工具调用、工具结果、状态变化和最终响应。
+
+Session 保存一段交互的工作状态，Memory 则面向跨 Session 的长期信息。两者不要混为一谈：
+
+- Session：当前任务的消息与临时状态；
+- Memory：经过筛选、可在未来检索的长期信息；
+- Artifact：文件、报告或其他大对象；
+- Event：本次执行中发生的事实。
+
+生产环境需要为这些 Service 选择持久化实现、隔离租户并定义保留周期。`InMemoryRunner` 适合开发验证，进程退出后数据消失。
+
+## 36.4 Tool 与权限边界
+
+ADK 可以把 Python 函数直接作为工具。函数签名和 Docstring 决定模型看到的工具接口：
+
+```python
+def query_sales(year: int, region: str | None = None) -> dict:
+    """Return governed sales data for a year and optional region."""
+    ...
+```
+
+工具应返回结构化、可解释结果，包括：
+
+- `status`：成功、拒绝或失败；
+- 业务数据；
+- 指标定义；
+- 证据源；
+- 可恢复错误信息。
+
+示例通过 `AGENT_SCOPES` 演示权限校验。生产系统不应信任普通环境变量，而应从认证中间件、Service Account 或请求上下文获得身份，并在数据库/API 层再次校验。
+
+## 36.5 Multi-Agent 不是默认答案
+
+ADK 支持父子 Agent 和 Agent Transfer，但每增加一个 Agent 都会引入：
+
+- 上下文传递和信息丢失；
+- 路由误判；
+- 更多模型调用和延迟；
+- 更复杂的 Trace 与评测；
+- 责任边界不清。
+
+只有当角色拥有不同工具、权限、上下文或优化目标时，才值得拆成多个 Agent。如果只是 Prompt 不同但访问同一数据、执行同一职责，先保留单 Agent。
+
+## 36.6 最小可运行 MVP
+
+目录结构：
+
+```text
+chapter36/
+├── __init__.py
+├── agent.py
+├── example.py
+├── requirements.txt
+└── .env.example
+```
+
+`agent.py` 导出 ADK 约定的 `root_agent`，包含：
+
+- Gemini 模型配置；
+- 企业销售分析 Instruction；
+- `query_sales` Function Tool；
+- Scope 校验和证据源。
+
+`example.py` 使用 `InMemoryRunner` 执行：
+
+```bash
+cd chapters/chapter36
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export GOOGLE_API_KEY="<your-api-key>"
+export AGENT_SCOPES="sales:read"
+python example.py "查询 2025 年各区域净销售额"
+```
+
+也可以从仓库的 `chapters` 目录使用 ADK 开发命令加载 `chapter36` Agent。官方 Web UI 面向本地开发与调试，不应直接作为生产服务暴露。
+
+示例采用静态数据，目的是验证 Tool Contract、Runner 和事件执行。替换为数据库后，保留工具签名、权限校验和证据字段即可。
+
+## 36.7 与相邻框架对比
+
+| 维度 | Google ADK | OpenAI Agents SDK | LangGraph |
+| --- | --- | --- | --- |
+| 核心抽象 | Agent / Runner / Session / Event | Agent / Runner / Tool | State / Node / Edge |
+| 确定性 Workflow | 内置 Workflow Agent | 通常在应用层组合 | Graph 是核心 |
+| 多 Agent | 子 Agent、Transfer | Handoff、Agent-as-Tool | 子图、节点和路由 |
+| 状态服务 | Session/Memory Service | Session/Context | Checkpointer/Store |
+| 生态优势 | Gemini、Google Cloud | OpenAI 模型与工具 | 显式状态和恢复 |
+| 学习成本 | 中等 | 较低 | 较高 |
+
+如果团队已经运行在 Google Cloud，并希望统一模型、Agent、评测和部署体验，ADK 是自然选择。若只需一个轻量 OpenAI 工具 Agent，Agents SDK 更直接；若主要问题是复杂状态转移和恢复，LangGraph 更清晰。
+
+## 36.8 生产架构
+
+推荐把 ADK Agent 放在以下边界内：
+
+```text
+API Gateway / Identity
+        |
+Agent Service
+  ├── ADK Runner
+  ├── Session Service
+  ├── Memory Service
+  └── Artifact Service
+        |
+Governed Tools
+  ├── Data API
+  ├── Search
+  └── Business Services
+```
+
+Agent Service 不直接持有无限权限。每个 Tool 使用短期凭证访问领域服务；领域服务负责最终授权、审计和租户过滤。
+
+## 36.9 生产化清单
+
+- 使用持久化 Session/Memory/Artifact Service；
+- 从真实身份系统构造 Tool 权限；
+- 区分开发 Runner、测试 Runner 和生产部署；
+- 为 Tool 定义超时、重试、幂等与错误码；
+- 保存 Event 流并关联业务 Trace ID；
+- 对 Agent Transfer 设置目标白名单和最大次数；
+- 管理 Instruction、模型与 Tool Schema 版本；
+- 为权限拒绝、空数据、模型失败和恢复建立评测；
+- 对 Artifact 和 Session 数据加密并设置生命周期；
+- 在成本预算内限制循环次数和并行度。
+
+## 36.10 优点、局限与适用场景
+
+优点：
+
+- Agent 与 Runner/Service 分离，模块边界清晰；
+- 同时支持 LLM 推理与确定性 Workflow Agent；
+- Session、Memory、Artifact、Event 模型较完整；
+- 与 Google 模型及云平台衔接自然。
+
+局限：
+
+- 服务抽象较多，初学成本高于极简 SDK；
+- 生产能力与 Google 生态结合较深时会产生平台依赖；
+- Function Tool 的业务权限仍需自行实现；
+- 多 Agent 设计不当会显著增加成本和调试难度。
+
+最适合：Google Cloud 企业应用、Gemini 驱动的多模态 Agent、需要统一会话/事件服务的系统，以及同时包含 LLM Agent 和确定性工作流的项目。
 
 ## Summary
 
-Google ADK 从 Agent 应用工程角度组织 Agent、Tool、Session 和 Runner。
+Google ADK 的关键不在于“调用 Gemini”，而在于把 Agent 定义、运行循环和状态服务分开。LLM Agent 负责开放式判断，Workflow Agent 负责确定性编排，Service 负责会话、记忆和产物。
 
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
-
-## Notes
-
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+本章 MVP 展示了可被 ADK 工具链识别的 `root_agent` 工程结构，以及如何通过 Runner 执行一个带权限和证据源的工具型 Agent。
 
 ## References
 
-[1] Google.  
-Agent Development Kit Documentation.  
+[1] Google. Agent Development Kit Documentation.
 https://adk.dev/
 
-[2] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[2] Google. Get Started with ADK for Python.
+https://adk.dev/get-started/python/
 
-[3] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
-
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Google. ADK Apps.
+https://adk.dev/apps/

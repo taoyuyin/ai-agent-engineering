@@ -6,101 +6,241 @@ Version: 2026-07
 
 Last Updated: 2026-07-31
 
-## Core Question
+## 本章结论
 
-本章要回答：`Dify` 在 AI Agent Engineering 中到底解决什么问题？
+Dify 更准确的定位是 Agent Application Platform，而不是 Python Agent Framework。它把模型、Prompt、知识库、Tool、Workflow、监控和应用发布集中到可视化平台，并通过 API 把已发布应用交付给业务系统。
 
-## Chapter Conclusion
+它适合跨职能团队快速构建和运营 Agent 应用；代价是平台版本、Workflow DSL、插件安全、部署和变更治理会成为新的工程责任。
 
-Dify 更接近 Agent Platform，用产品化方式组织工作流、知识库、模型和应用发布。
+## 学习目标
 
-## Learning Objectives
+完成本章后，你应该能够：
 
-完成本章后，你应该能够理解：
+- 区分 Agent Framework 与 Agent Platform；
+- 理解 Dify Chatflow、Workflow、Agent Node、Knowledge 和 Tool；
+- 设计可被外部服务调用的稳定 Workflow Contract；
+- 使用 Python API Client 调用已发布 Workflow；
+- 评估自托管、平台治理和供应商/DSL 依赖。
 
-- Agent Platform
-- Workflow
-- Knowledge Base
-- Model Provider
-- App
+## 41.1 为什么 Dify 不是普通框架
 
-## 本章定位
+代码框架主要提供库和运行时，应用团队仍需搭建 UI、配置管理、知识库、日志和发布流程。Dify 把这些能力放到一个平台：
 
-本章属于 `Part V Frameworks`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+| 平台能力 | 解决的问题 |
+| --- | --- |
+| Model Provider | 统一配置不同模型 |
+| Prompt/LLM Node | 可视化维护推理步骤 |
+| Workflow/Chatflow | 组合节点、变量、分支和迭代 |
+| Knowledge | 文档摄取、检索和引用 |
+| Tool/Plugin | 连接外部 API 与能力 |
+| Application API | 将发布应用暴露给业务系统 |
+| Logs/Monitoring | 查看执行记录和问题 |
+| Version/Export | 管理应用配置与迁移 |
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+因此 Dify 的交付物不仅是 Python 文件，还包括平台中的 Workflow、知识配置、凭证和发布版本。
 
-## 主要内容
+## 41.2 Workflow、Chatflow 与 Agent Node
 
-### 41.1 Agent Platform
+- **Workflow**：面向自动化任务和 API 执行，输入和输出明确；
+- **Chatflow**：面向多轮对话应用，包含会话语义；
+- **Agent Node**：在 Workflow 中让模型自主选择工具；
+- **LLM Node**：执行一次相对确定的模型调用；
+- **Knowledge Retrieval Node**：从知识库召回上下文；
+- **Code/HTTP Node**：执行确定性处理或调用外部服务。
 
-Agent Platform 是本章理解 `Dify` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+原则是：能用确定性节点表达的业务规则，就不要交给 Agent Node。权限、金额阈值、状态判断和发布审批应由代码、条件分支或外部服务控制。
 
-在实际系统中，`Agent Platform` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 41.3 稳定 Contract 比画布更重要
 
-### 41.2 Workflow
+业务系统不应该依赖画布中的内部节点名，而应依赖已发布应用的输入输出 Contract。
 
-Workflow 是本章理解 `Dify` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+本章定义：
 
-在实际系统中，`Workflow` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 41.3 Knowledge Base
-
-Knowledge Base 是本章理解 `Dify` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Knowledge Base` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 41.4 Model Provider
-
-Model Provider 是本章理解 `Dify` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Model Provider` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 41.5 App
-
-App 是本章理解 `Dify` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`App` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-## Python 示例
-
-本章配套示例见：
-
-```bash
-python chapters/chapter41/example.py
+```json
+{
+  "inputs": {
+    "question": "string",
+    "tenant_id": "string",
+    "scopes": "string"
+  },
+  "outputs": {
+    "answer": "string",
+    "evidence_source": "string"
+  }
+}
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+Contract 需要版本化。Workflow 内部可以从一个 LLM Node 演进到多个检索和 Agent Node，只要外部输入输出保持兼容，调用方就不需要修改。
 
-## Engineering Notes
+## 41.4 本章 Workflow 设计
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+在 Dify 控制台创建 Workflow：
+
+```text
+Start
+  inputs: question, tenant_id, scopes
+    |
+Scope Condition
+  ├── scopes contains "sales:read"
+  |      |
+  |   HTTP/Tool: governed sales API
+  |      |
+  |   LLM: summarize only returned facts
+  |      |
+  |   End
+  |     answer, evidence_source
+  |
+  └── unauthorized
+         |
+       End
+        answer="permission denied"
+        evidence_source=""
+```
+
+生产环境不应让 Dify 直接信任调用方提交的 `scopes`。更安全的方案是：
+
+1. 业务后端验证用户 Token；
+2. 后端用服务端保存的 Dify API Key 调用 Workflow；
+3. 受治理数据 API 根据服务身份和租户再次授权；
+4. Dify 只编排，不成为最终权限裁决者。
+
+本章的 `scopes` 输入用于展示 Contract，不代表完整 IAM 实现。
+
+## 41.5 Python API MVP
+
+目录：
+
+```text
+chapter41/
+├── README.md
+├── example.py
+├── workflow-contract.json
+├── workflow-setup.md
+├── requirements.txt
+└── .env.example
+```
+
+`example.py` 实现最小服务客户端：
+
+- 调用 `POST /v1/workflows/run`；
+- 使用 Bearer API Key；
+- 发送 Workflow Inputs；
+- 使用 `blocking` 响应模式；
+- 检查 HTTP 与 Workflow 两层状态；
+- 读取 `data.outputs`。
+
+运行前，按 [workflow-setup.md](workflow-setup.md) 在 Dify 创建并发布满足 `workflow-contract.json` 的 Workflow，然后获取应用 API Key：
+
+```bash
+cd chapters/chapter41
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export DIFY_BASE_URL="https://api.dify.ai"
+export DIFY_API_KEY="<your-workflow-api-key>"
+python example.py "查询 2025 年各区域净销售额"
+```
+
+自托管实例将 `DIFY_BASE_URL` 改为自己的域名。API Key 只能保存在服务端，不能放入浏览器或移动端。
+
+这个 MVP 是“可运行的集成工程”，其前置依赖是已发布的 Dify Workflow，就像数据库示例需要先有数据库服务一样。`workflow-contract.json` 是仓库与平台配置之间的稳定契约。
+
+## 41.6 阻塞与流式模式
+
+Workflow API 可根据应用能力选择阻塞或流式响应：
+
+- 阻塞适合短任务和服务到服务调用，错误处理简单；
+- 流式适合长生成和交互体验，需要处理事件、断线和重连；
+- 超长任务更适合异步任务架构，不能无限占用 HTTP 连接。
+
+本章使用阻塞模式以突出 Contract。生产客户端应增加连接池、超时、有限重试、请求 ID 和日志脱敏。
+
+## 41.7 版本与 Git 管理
+
+Dify Workflow 在平台中编辑，但企业仍需要 Git 审查：
+
+- 导出应用 DSL；
+- 将 DSL、外部 Tool OpenAPI Schema 和测试用例提交 Git；
+- PR 中审查模型、Prompt、节点、变量和权限变化；
+- 在测试环境导入并运行回归集；
+- 批准后发布新版本；
+- 保留回滚目标。
+
+导出的 DSL 可能随 Dify 版本变化，因此本章没有手写一个容易过期的伪 DSL。应从目标 Dify 实例导出真实文件，再纳入仓库。`workflow-contract.json` 则保持与平台版本相对独立。
+
+## 41.8 Dify 与代码框架横向比较
+
+| 维度 | Dify | LangGraph | OpenAI Agents SDK |
+| --- | --- | --- | --- |
+| 定位 | Agent 应用平台 | 状态图运行时 | Agent SDK |
+| 开发方式 | 可视化 + 配置 + API | Python 图代码 | Python Agent 代码 |
+| 内置知识库/UI/发布 | 强 | 需集成 | 需集成 |
+| 控制流 | Workflow/Chatflow 节点 | State/Node/Edge | Runner Agent Loop |
+| 源码审查 | 依赖导出 DSL | 原生 Git | 原生 Git |
+| 运维对象 | 完整平台 | 应用服务与状态存储 | 应用服务 |
+| 适合团队 | 产品、运营、工程协同 | 平台/后端工程 | AI/Python 工程 |
+
+若目标是快速交付带 UI、知识库和运营能力的应用，Dify 效率高；若目标是深度定制 Runtime、严格代码审查或嵌入已有微服务，代码框架通常更灵活。
+
+## 41.9 自托管架构与安全
+
+典型自托管组件包括 Web/API、Worker、数据库、缓存、向量存储、对象存储和 Sandbox。生产部署需要关注：
+
+- 各组件的版本兼容和升级迁移；
+- Worker 扩缩容与队列积压；
+- 向量库、数据库和对象存储备份；
+- Sandbox 与外部网络访问策略；
+- 插件来源、签名和权限；
+- 模型密钥、Tool 凭证和租户隔离；
+- 日志中的 Prompt、文档和 PII；
+- 高可用、灾备和容量规划。
+
+“自托管”不自动等于“数据安全”，它只是把安全和运维责任转移给团队。
+
+## 41.10 生产化清单
+
+- API Key 只保存在后端 Secret Manager；
+- 为 Workflow 输入输出建立版本化 Contract；
+- 从目标实例导出真实 DSL 并提交 Git；
+- 测试授权、空数据、模型失败和 Tool 超时分支；
+- 外部 Tool API 执行最终权限和租户隔离；
+- 为发布设置开发、测试、生产环境；
+- 监控运行量、失败率、延迟、Token 和队列；
+- 审查 Plugin、Code Node 和外部网络权限；
+- 建立知识库更新、删除与 ACL 流程；
+- 设计平台升级、备份和回滚演练。
+
+## 41.11 优点、局限与适用场景
+
+优点：
+
+- 从模型、Workflow、知识库到发布的一站式能力；
+- 可视化降低跨职能协作门槛；
+- API 便于与现有业务系统集成；
+- 适合快速迭代和运营 Agent 应用。
+
+局限：
+
+- 平台本身需要部署、升级和安全治理；
+- 可视化 DSL 的代码审查体验不如原生 Python；
+- 深度定制会受到节点和插件机制约束；
+- 应用配置、凭证和平台版本会形成迁移成本。
+
+最适合：企业知识助手、客服、内部流程自动化、原型到应用发布，以及产品、运营和工程共同维护的 Agent 项目。
 
 ## Summary
 
-Dify 更接近 Agent Platform，用产品化方式组织工作流、知识库、模型和应用发布。
+Dify 把 Agent 从一个 Python 运行循环提升为可运营的应用平台。它的价值是集成与交付速度，而不是免除工程治理。
 
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
-
-## Notes
-
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+本章用 `workflow-contract.json + Python API Client` 表达平台型项目的最小交付：平台内部 Workflow 可以演进，外部服务通过稳定 Contract 调用。生产系统还必须把真实授权、版本、凭证和平台运维纳入架构。
 
 ## References
 
-[1] Dify.  
-Documentation.  
+[1] Dify. Documentation.
 https://docs.dify.ai/
 
-[2] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[2] Dify. Run Workflow API.
+https://docs.dify.ai/api-reference/workflow-execution/run-workflow
 
-[3] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
-
-以上 URL 已在 2026-07-31 验证可访问。
+[3] Dify. GitHub Repository.
+https://github.com/langgenius/dify

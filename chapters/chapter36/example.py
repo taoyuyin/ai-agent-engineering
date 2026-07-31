@@ -1,15 +1,24 @@
-"""Chapter 36: Google ADK
+"""Google ADK: run the sales agent with an in-memory Runner."""
 
-Framework analysis template.
-"""
+from __future__ import annotations
 
-FRAMEWORK = "Google ADK"
-CRITERIA = ["design_goal", "core_abstraction", "strength", "tradeoff", "best_fit"]
+import asyncio
+from sys import argv
+
+from google.adk.runners import InMemoryRunner
+
+from agent import root_agent
 
 
-def review_framework():
-    return {key: "TODO" for key in CRITERIA}
+async def run() -> None:
+    question = " ".join(argv[1:]) or "查询 2025 年各区域净销售额"
+    runner = InMemoryRunner(agent=root_agent, app_name="governed_sales_agent")
+    try:
+        response = await runner.run_debug(question)
+        print(response)
+    finally:
+        await runner.close()
 
 
 if __name__ == "__main__":
-    print(FRAMEWORK, review_framework())
+    asyncio.run(run())

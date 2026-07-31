@@ -1,0 +1,29 @@
+{
+  "app_type": "workflow",
+  "inputs": {
+    "question": {
+      "type": "string",
+      "required": true
+    },
+    "tenant_id": {
+      "type": "string",
+      "required": true
+    },
+    "scopes": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "answer": {
+      "type": "string"
+    },
+    "evidence_source": {
+      "type": "string"
+    }
+  },
+  "policy": {
+    "required_scope": "sales:read",
+    "evidence_source": "demo.sales_orders"
+  }
+}

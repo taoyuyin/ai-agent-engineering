@@ -90,6 +90,8 @@ ai-agent-engineering/
 
 ### Part V Frameworks —— 主流 Agent 框架设计
 
+使用同一个受治理销售分析业务，对八种框架/平台的运行时、状态、工具、输出、权限与恢复能力进行横向比较。每章包含独立 `requirements.txt`、环境变量模板和具备完整运行入口的 Python MVP。
+
 - [Chapter 34 OpenAI Agents SDK](chapters/chapter34/README.md)
 - [Chapter 35 LangGraph](chapters/chapter35/README.md)
 - [Chapter 36 Google ADK](chapters/chapter36/README.md)
@@ -151,7 +153,11 @@ docker compose -f examples/sql-agent/docker-compose.yml up --build
 运行任意章节的独立 MVP：
 
 ```bash
-python chapters/chapter05/example.py
+cd chapters/chapter34
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python example.py
 ```
 
 ## 核心路线
@@ -161,7 +167,9 @@ python chapters/chapter05/example.py
 ```text
 Agent Runtime
   ↓
-OpenAI Agents SDK / LangGraph / Google ADK / CrewAI / AutoGen / Dify
+OpenAI Agents SDK / LangGraph / Google ADK / CrewAI
+  ↓
+AutoGen / PydanticAI / LlamaIndex / Dify
 ```
 
 先理解并实现 Agent Runtime，再学习成熟框架为什么这样设计。
