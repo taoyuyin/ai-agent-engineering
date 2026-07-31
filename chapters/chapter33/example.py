@@ -1,15 +1,16 @@
-"""Chapter 33: Deployment
+"""Chapter 33: exercise the service boundary without starting a network server."""
 
-Production engineering checklist as Python data.
-"""
-
-CHECKLIST = ['服务化', '扩缩容', '多模型部署', '配置', '发布']
+from deployment_runtime import AgentService
 
 
-def validate_system(enabled_items):
-    missing = [item for item in CHECKLIST if item not in enabled_items]
-    return {"ready": not missing, "missing": missing}
+def main() -> None:
+    service = AgentService(model_endpoint="http://model-gateway:8000", max_request_chars=2000)
+    service.mark_ready()
+    print(service.health())
+    run = service.create_run({"tenant_id": "retail", "goal": "生成销售摘要"})
+    print(run)
+    print(service.get_run(run["run_id"]))
 
 
 if __name__ == "__main__":
-    print(validate_system(CHECKLIST[:3]))
+    main()

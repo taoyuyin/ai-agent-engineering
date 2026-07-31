@@ -1,15 +1,16 @@
-"""Chapter 30: Observability
+"""Chapter 30: record a nested Agent trace without leaking secrets."""
 
-Production engineering checklist as Python data.
-"""
-
-CHECKLIST = ['Logging', 'Tracing', 'Timeline', 'Metrics', 'Debug']
+from observability_runtime import TraceRecorder
 
 
-def validate_system(enabled_items):
-    missing = [item for item in CHECKLIST if item not in enabled_items]
-    return {"ready": not missing, "missing": missing}
+def main() -> None:
+    recorder = TraceRecorder("run-42")
+    with recorder.span("agent.run", {"tenant_id": "retail"}):
+        with recorder.span("tool.call", {"tool": "crm.read", "api_key": "secret"}):
+            pass
+    print(recorder.to_json())
+    print(recorder.metrics())
 
 
 if __name__ == "__main__":
-    print(validate_system(CHECKLIST[:3]))
+    main()

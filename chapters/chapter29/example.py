@@ -1,15 +1,33 @@
-"""Chapter 29: Evaluation
+"""Chapter 29: run an offline release gate for an Agent."""
 
-Production engineering checklist as Python data.
-"""
-
-CHECKLIST = ['Offline', 'Online', 'Benchmark', '任务成功率', '质量评分']
+from evaluation_runtime import AgentResult, EvalCase, EvaluationSuite
 
 
-def validate_system(enabled_items):
-    missing = [item for item in CHECKLIST if item not in enabled_items]
-    return {"ready": not missing, "missing": missing}
+def main() -> None:
+    suite = EvaluationSuite(min_pass_rate=0.8)
+    report = suite.run(
+        [
+            EvalCase(
+                case_id="refund-policy",
+                required_terms=("七日",),
+                expected_tools=("policy.search",),
+                require_citations=True,
+                max_latency_ms=1200,
+                max_cost_usd=0.02,
+            )
+        ],
+        {
+            "refund-policy": AgentResult(
+                answer="退款须在七日内申请 [policy-7]",
+                tools=("policy.search",),
+                citations=("policy-7",),
+                latency_ms=320,
+                cost_usd=0.004,
+            )
+        },
+    )
+    print(report)
 
 
 if __name__ == "__main__":
-    print(validate_system(CHECKLIST[:3]))
+    main()

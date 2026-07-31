@@ -1,15 +1,14 @@
-"""Chapter 28: Guardrails
+"""Chapter 28: enforce guardrails before and after model execution."""
 
-Production engineering checklist as Python data.
-"""
-
-CHECKLIST = ['安全', '输出控制', '权限', '策略', '人工确认']
+from guardrail_runtime import GuardrailPipeline, ToolProposal
 
 
-def validate_system(enabled_items):
-    missing = [item for item in CHECKLIST if item not in enabled_items]
-    return {"ready": not missing, "missing": missing}
+def main() -> None:
+    pipeline = GuardrailPipeline(allowed_tools={"crm.read"}, sensitive_fields={"phone", "email"})
+    print(pipeline.check_input("查询客户订单状态"))
+    print(pipeline.check_tool(ToolProposal("crm.read", {"customer_id": "C-7"})))
+    print(pipeline.check_output({"answer": "已发货", "phone": "13800000000"}))
 
 
 if __name__ == "__main__":
-    print(validate_system(CHECKLIST[:3]))
+    main()

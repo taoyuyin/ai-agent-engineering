@@ -1,4 +1,4 @@
-# Chapter 30 Observability
+# Chapter 30 Observability：看见 Agent 为什么这样行动
 
 Part IV Agent Engineering —— 如何构建企业级 Agent
 
@@ -8,99 +8,115 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Observability` 在 AI Agent Engineering 中到底解决什么问题？
+如何用 Logging、Metrics、Tracing 和 Timeline 重建一次 Agent Run 的决策与执行过程？
 
 ## Chapter Conclusion
 
-Observability 让 Agent 的多步执行过程可追踪、可解释、可调试。
+Agent Observability 的最小分析单元不是 HTTP 请求，而是包含模型、检索、工具、状态转移和评估的 Run。Trace 负责因果关系，Metrics 负责趋势告警，Logs/Events 负责审计细节。
 
 ## Learning Objectives
 
-完成本章后，你应该能够理解：
+- 设计 run/trace/span/event 数据模型
+- 建立模型、RAG、Tool 和 Workflow 统一关联
+- 区分运维 telemetry、质量证据与审计日志
+- 对比 OTel、OpenInference、Langfuse、Phoenix、LangSmith
+- 运行一个嵌套、脱敏、错误可见的 Trace Recorder
 
-- Logging
-- Tracing
-- Timeline
-- Metrics
-- Debug
+## 30.1 为什么普通 APM 不够
 
-## 本章定位
+HTTP 200 只表示接口成功，不表示答案正确。Agent 失败可能来自错误 Prompt 版本、召回旧文档、模型选错工具、重试耗尽或审批超时。因此要记录 logical run，而不只记录进程调用。
 
-本章属于 `Part IV Agent Engineering`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+## 30.2 Trace 模型
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
-
-## 主要内容
-
-### 30.1 Logging
-
-Logging 是本章理解 `Observability` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Logging` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 30.2 Tracing
-
-Tracing 是本章理解 `Observability` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Tracing` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 30.3 Timeline
-
-Timeline 是本章理解 `Observability` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Timeline` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 30.4 Metrics
-
-Metrics 是本章理解 `Observability` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Metrics` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 30.5 Debug
-
-Debug 是本章理解 `Observability` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Debug` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-## Python 示例
-
-本章配套示例见：
-
-```bash
-python chapters/chapter30/example.py
+```text
+Run / Trace
+├── goal.compile
+├── retrieval.query
+│   └── rerank
+├── model.generate
+├── tool.call
+├── reflection
+└── evaluator
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+关键属性包括 run_id、tenant_id、prompt/model/tool/knowledge version、token、cost、status、retry、citation 和 policy decision。敏感正文默认不采集或先脱敏。
 
-## Engineering Notes
+## 30.3 四类信号
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+| 信号 | 回答 |
+|---|---|
+| Metrics | 失败率、P95、成本是否异常 |
+| Trace | 哪一步、为何慢或失败 |
+| Structured Log/Event | 具体状态和错误上下文 |
+| Audit | 谁以何身份对什么资源做了什么 |
+
+审计记录通常需要更强不可变性和保留策略，不能等同于调试日志。
+
+## 30.4 工具横向对比
+
+| 工具 | 定位 | 优点 | 局限 |
+|---|---|---|---|
+| OpenTelemetry | 通用 telemetry 标准 | 厂商中立、生态广 | Agent UI/评估需上层 |
+| OpenInference | AI/LLM 语义约定与 instrumentation | 衔接 OTel、框架覆盖广 | 后端需另选 |
+| Langfuse | LLM trace、prompt、eval、usage | 开源/托管、Agent 视图 | 与通用 APM 仍需整合 |
+| Arize Phoenix | Trace、RAG/LLM 分析和评估 | OpenInference 生态强 | 企业运维方案需评估 |
+| LangSmith | LangChain trace/eval/deployment 体验 | 生态集成顺滑 | 平台耦合权衡 |
+| OpenAI Agents Tracing | SDK 原生 Agent trace | 接入成本低 | 跨栈统一需 OTel/网关 |
+
+## 30.5 采样与隐私
+
+全量保存 Prompt/Output 会带来 PII、密钥、知识产权和成本风险。建议：
+
+- metadata 全量，正文按风险采样；
+- ingest 前 redaction/tokenization；
+- tenant 与环境分区；
+- debug 临时提权并审计；
+- 生产保留期、删除和导出策略明确。
+
+## 30.6 企业案例：客服 Agent 事故
+
+投诉显示 Agent 错误承诺退款。通过 trace 发现检索命中了已退役政策，原因是删除事件未传播到向量索引。系统可按 knowledge_version 找到全部受影响 Run，回放评估、下线索引并通知相关客户。只有一条文本日志无法完成此类影响分析。
+
+## 30.7 Python MVP
+
+`observability_runtime` 实现 parent-child span、duration、status、属性脱敏、JSON 导出和聚合指标：
+
+```bash
+python3 chapters/chapter30/example.py
+python3 -m unittest discover -s chapters/chapter30 -p "test_*.py"
+```
+
+## 30.8 Production Readiness Checklist
+
+- [ ] 所有组件传播 run/trace context
+- [ ] Span 覆盖 model、retrieval、tool、workflow、eval
+- [ ] 版本、usage、policy decision 可关联
+- [ ] 错误、重试和 fallback 明确记录
+- [ ] Prompt/Output 默认最小化并脱敏
+- [ ] 质量、延迟、成本、安全分别告警
+- [ ] Trace 可链接 evaluation 和用户反馈
+- [ ] 审计存储与调试日志分离
 
 ## Summary
 
-Observability 让 Agent 的多步执行过程可追踪、可解释、可调试。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Observability 让非确定性系统具备可调查性。能重建 Run，团队才有能力定位回归、评估影响、控制成本并安全迭代。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+OpenTelemetry GenAI 语义约定仍在演进；生产 schema 应显式版本化，并通过 adapter 与内部稳定事件模型解耦。
 
 ## References
 
-[1] OpenTelemetry.  
-Documentation.  
-https://opentelemetry.io/docs/
+[1] OpenTelemetry, Generative AI semantic conventions.
+https://opentelemetry.io/docs/specs/semconv/gen-ai/
 
-[2] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[2] OpenInference Documentation.
+https://arize-ai.github.io/openinference/
 
-[3] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[3] Langfuse Documentation.
+https://langfuse.com/docs
 
-以上 URL 已在 2026-07-31 验证可访问。
+[4] OpenAI Agents SDK, Tracing.
+https://openai.github.io/openai-agents-python/tracing/
+
+以上 URL 已在 2026-07-31 核对。

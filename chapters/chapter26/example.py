@@ -1,15 +1,20 @@
-"""Chapter 26: RAG
+"""Chapter 26: build a small citation-preserving RAG pipeline."""
 
-Production engineering checklist as Python data.
-"""
-
-CHECKLIST = ['Index', 'Chunk', 'Retrieve', 'Generate', '引用', '评测']
+from rag_runtime import Document, RAGPipeline
 
 
-def validate_system(enabled_items):
-    missing = [item for item in CHECKLIST if item not in enabled_items]
-    return {"ready": not missing, "missing": missing}
+def main() -> None:
+    rag = RAGPipeline(chunk_size=28, overlap=6)
+    rag.index(
+        [
+            Document("policy-1", "差旅报销须在行程结束后 30 天内提交。", "policy://travel"),
+            Document("policy-2", "采购超过五万元需要部门负责人审批。", "policy://purchase"),
+        ]
+    )
+    result = rag.retrieve("差旅报销多久提交", top_k=2)
+    print(result.context)
+    print(result.citations)
 
 
 if __name__ == "__main__":
-    print(validate_system(CHECKLIST[:3]))
+    main()

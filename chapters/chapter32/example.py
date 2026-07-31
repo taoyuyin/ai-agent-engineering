@@ -1,15 +1,20 @@
-"""Chapter 32: Cost Optimization
+"""Chapter 32: route work to the cheapest capable model under budget."""
 
-Production engineering checklist as Python data.
-"""
-
-CHECKLIST = ['Token', '模型路由', 'Cache', '批处理', '预算']
+from cost_runtime import BudgetLedger, ModelProfile, ModelRouter, RouteRequest
 
 
-def validate_system(enabled_items):
-    missing = [item for item in CHECKLIST if item not in enabled_items]
-    return {"ready": not missing, "missing": missing}
+def main() -> None:
+    models = [
+        ModelProfile("small", frozenset({"extract", "classify"}), 1, 0.20, 0.80),
+        ModelProfile("reasoning", frozenset({"extract", "classify", "reason"}), 3, 2.00, 8.00),
+    ]
+    ledger = BudgetLedger(limit_usd=1.0)
+    router = ModelRouter(models, ledger)
+    decision = router.route(RouteRequest("classify", quality_tier=1, input_tokens=800, output_tokens=80))
+    ledger.record(decision.estimated_cost_usd)
+    print(decision)
+    print(ledger)
 
 
 if __name__ == "__main__":
-    print(validate_system(CHECKLIST[:3]))
+    main()

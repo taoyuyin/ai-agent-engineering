@@ -1,15 +1,25 @@
-"""Chapter 27: Semantic Layer
+"""Chapter 27: compile a governed metric request into parameterized SQL."""
 
-Production engineering checklist as Python data.
-"""
-
-CHECKLIST = ['企业数据语义', '指标', '维度', '口径', '权限', 'Data Agent']
+from semantic_runtime import MetricDefinition, MetricRequest, SemanticLayer
 
 
-def validate_system(enabled_items):
-    missing = [item for item in CHECKLIST if item not in enabled_items]
-    return {"ready": not missing, "missing": missing}
+def main() -> None:
+    layer = SemanticLayer()
+    layer.register(
+        MetricDefinition(
+            name="net_revenue",
+            expression="SUM(order_amount - refund_amount)",
+            source_table="analytics.orders",
+            dimensions=("region", "product"),
+            time_dimension="order_date",
+            owner="finance",
+            unit="CNY",
+        )
+    )
+    plan = layer.compile(MetricRequest("net_revenue", ("region",), {"region": "华东"}))
+    print(plan.sql)
+    print(plan.parameters)
 
 
 if __name__ == "__main__":
-    print(validate_system(CHECKLIST[:3]))
+    main()

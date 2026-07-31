@@ -1,15 +1,18 @@
-"""Chapter 31: Performance
+"""Chapter 31: cache repeated work and parallelize independent tasks."""
 
-Production engineering checklist as Python data.
-"""
-
-CHECKLIST = ['Latency', 'Cache', 'Batch', 'Streaming', '并发']
+from performance_runtime import PerformanceRuntime, Task
 
 
-def validate_system(enabled_items):
-    missing = [item for item in CHECKLIST if item not in enabled_items]
-    return {"ready": not missing, "missing": missing}
+def main() -> None:
+    runtime = PerformanceRuntime(max_workers=2, cache_ttl_seconds=60)
+    tasks = [
+        Task("profile", "customer-7", lambda: {"tier": "gold"}),
+        Task("orders", "customer-7", lambda: ["O-1", "O-2"]),
+    ]
+    print(runtime.execute(tasks, deadline_ms=500))
+    print(runtime.execute(tasks, deadline_ms=500))
+    print(runtime.stats)
 
 
 if __name__ == "__main__":
-    print(validate_system(CHECKLIST[:3]))
+    main()
