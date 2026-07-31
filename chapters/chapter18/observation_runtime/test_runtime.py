@@ -15,6 +15,14 @@ class ObservationTest(unittest.TestCase):
         )
         self.assertTrue(observation.retryable)
 
+    def test_adapts_mcp_structured_content(self) -> None:
+        observation = ObservationBuilder().from_mcp(
+            "1", "sales", {"structuredContent": {"revenue": 10}, "isError": False}, "mcp://sales"
+        )
+        self.assertEqual("success", observation.status)
+        self.assertEqual("mcp://sales", observation.source)
+        self.assertFalse(observation.trusted_as_instruction)
+
 
 if __name__ == "__main__":
     unittest.main()

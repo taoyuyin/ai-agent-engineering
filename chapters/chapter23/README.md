@@ -37,7 +37,8 @@ Intelligence Plane
 Goal · Planner · Model Gateway · Context · Reflection · Multi-Agent
         ↓
 Capability & Data Plane
-Tool Gateway · MCP · Semantic Layer · Memory · Enterprise Systems
+Embedding Gateway · Retrieval/Rerank · Tool Gateway · MCP
+Semantic Layer · Memory · Vector Index · Enterprise Systems
 ```
 
 Governance 不是最后加的一层过滤器，而是穿过每个调用和状态转移。
@@ -52,6 +53,8 @@ Governance 不是最后加的一层过滤器，而是穿过每个调用和状态
 | Planner | goal/observation | Plan | 分解与更新 |
 | Context Compiler | state/data | model request | 选择、隔离、预算 |
 | Model Gateway | request/policy | model output | 路由、fallback、usage |
+| Embedding Gateway | text/model policy | versioned vector | 模型、维度、批处理和 usage |
+| Retrieval Service | query/scope | ranked candidates | hybrid search、filter、rerank |
 | Tool Gateway | tool call/identity | ToolResult | schema、权限、执行 |
 | Observation Adapter | result | Observation | 归一、脱敏、来源 |
 | Memory | policy/data | records/retrieval | 持久、更新、遗忘 |
@@ -153,6 +156,34 @@ API → Run Store → Queue/Workflow → Agent Worker
 
 不同租户、数据等级和工具风险可以运行在不同安全域。
 
+## Part II 底层能力的完整架构投影
+
+```text
+Request → Token/Run Budget
+  ↓
+Goal Compiler ── Reasoning + Structured Output
+  ↓
+Planner ─────── Reasoning → validated Plan IR
+  ↓
+Embedding Gateway
+  ├── Memory Retrieval
+  ├── Knowledge Retrieval
+  ├── Tool Discovery
+  └── Agent Discovery
+  ↓
+Context Compiler ── Context Window + section budget
+  ↓
+Model Gateway → Function Call Proposal
+  ↓
+Tool/MCP Gateway ── authorize + execute
+  ↓
+Observation Adapter ── normalize + truncate + trust label
+  ↓
+Evaluator / Reflection → State Machine / Workflow / Audit
+```
+
+Embedding Model、Vector Index、Retriever 和 Context Compiler 是四个不同职责：模型负责表示，索引负责 ANN，Retriever 负责 filter/fusion/rerank，Context Compiler 决定什么真正进入模型。企业平台通常通过 Embedding Gateway 统一管理模型版本、维度、重建索引、批量与在线流量、成本和数据边界。
+
 ## 23.9 企业案例：经营分析 Agent Platform
 
 用户通过 SSO 发起报告任务。Goal Compiler 固化数据范围和验收标准，Workflow 冻结 snapshot 并并行调用领域 Agent。所有数据访问经 Semantic/Tool Gateway 执行行级权限，Observation 带来源。Evaluator 检查指标定义和引用，管理者批准后发布。平台记录模型/Prompt/Tool/数据版本，使报告可复现。
@@ -173,6 +204,8 @@ MVP 是 composition root：`AgentRequest` 携带 tenant/actor/scope，PolicyEnfo
 - [ ] 模型输出只作为 command proposal
 - [ ] Tool Gateway 独立执行授权
 - [ ] Memory 与数据检索在查询阶段隔离租户
+- [ ] Embedding 模型、维度和索引版本可追踪与迁移
+- [ ] Tool、Memory、Agent Discovery 分别评估 recall@k 与越权率
 - [ ] 长任务使用 durable workflow
 - [ ] Side effect 有审批、幂等、补偿和对账
 - [ ] Context、trace 和日志执行脱敏

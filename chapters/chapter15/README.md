@@ -113,6 +113,21 @@ Tool Result 是供应商或函数返回的原始数据；Observation 是 Runtime
 
 Chapter 18 会实现这层转换。
 
+## Part II 能力在本章中的应用
+
+当工具数量增加时，Embedding、Function Calling 与 MCP 分别承担不同责任：
+
+```text
+Goal → Embedding/Keyword Tool Search → Top-K Candidates
+     → Scope/Risk/Health Filter → Model-visible Schemas
+     → Function Call Proposal → Runtime Authorization
+     → Local Function / API / MCP → ToolResult
+```
+
+Embedding 用于语义召回，不用于授权；Token/Context 决定暴露多少 schema；Function Calling 产生结构化提案；MCP 提供跨进程 discovery/call；Tool Gateway 在执行时重新验证 scope、tenant、schema 和副作用。
+
+本章完整示例增加语义 Tool Discovery，同时保留 capability filter、成本路由、最小权限和执行时二次授权。
+
 ## 15.7 业务案例：多数据源销售查询
 
 一个销售 Agent 有三种读取实现。Router 先检查 `sales:read`，再根据请求：

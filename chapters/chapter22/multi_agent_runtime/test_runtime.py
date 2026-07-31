@@ -16,6 +16,19 @@ class CoordinatorTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             coordinator.delegate(TaskEnvelope("1", "x", ("read",), ("r",)))
 
+    def test_semantic_discovery_applies_scope_first(self) -> None:
+        coordinator = Coordinator()
+        coordinator.register(
+            AgentCard("sales", ("analysis",), ("sales:read",), "分析销售收入"),
+            lambda task: {"evidence": ["1"]},
+        )
+        coordinator.register(
+            AgentCard("admin", ("analysis",), ("admin",), "分析销售收入"),
+            lambda task: {"evidence": ["2"]},
+        )
+        cards = coordinator.discover("销售趋势分析", ("sales:read",))
+        self.assertEqual(["sales"], [card.agent_id for card in cards])
+
 
 if __name__ == "__main__":
     unittest.main()

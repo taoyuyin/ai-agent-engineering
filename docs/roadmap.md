@@ -188,6 +188,23 @@ Agent 的五个组成：
 
 这是全书核心。
 
+Part III 不重复 Part II 的底层原理，而是回答这些能力如何进入 Agent Runtime：
+
+| Part II 底层能力 | Part III 架构落点 |
+|---|---|
+| Transformer / Model | Model Gateway、Planner、Reflection、Multi-Agent |
+| Token | Run Budget、Context Budget、Observation Size、Cost |
+| Embedding | Tool Discovery、Memory Retrieval、Agent Discovery、Knowledge Retrieval |
+| Context | Context Compiler、Step Input、Delegation Envelope、Checkpoint |
+| Reasoning | Goal Compiler、Planner、Reflection、Evaluator |
+| Function Calling | Tool Proposal、Structured Command、Observation、State Event |
+| MCP | Tool/Data Gateway、Capability Discovery、跨进程调用与治理 |
+
+每章示例必须展示两层边界：
+
+1. 模型或底层能力生成候选、分数或结构化提案；
+2. Runtime 使用 schema、状态、权限、预算和策略做确定性控制。
+
 ### Chapter 12 Agent 生命周期
 
 主要内容：

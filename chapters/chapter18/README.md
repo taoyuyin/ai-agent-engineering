@@ -108,6 +108,24 @@ Prompt 提醒只是纵深防御，不能替代这些确定性控制。
 
 统一 Observation 可以把供应商细节隔离在 Adapter 层。
 
+## Part II 能力在本章中的应用
+
+Observation 是 Function Calling/MCP 世界进入模型 Context 的安全适配层：
+
+```text
+Function Call / MCP Response / API Result
+        ↓ protocol adapter
+ToolResult
+        ↓ schema, size, error, provenance, DLP
+Observation
+        ↓ token budget + trust label
+Next-step Context
+```
+
+Token 决定结果能否直接进入上下文；Context Policy 决定保留摘要、分页句柄还是 artifact URI；MCP 的内容和错误需要归一为内部分类。外部返回永远是 data，不因来自工具而成为 instruction。
+
+本章示例覆盖成功、截断、来源、可重试错误和信任标记，并提供 MCP 风格结果适配入口。
+
 ## 18.7 业务案例：SQL Agent
 
 SQL 执行结果不能直接送给模型。Adapter 应附加：

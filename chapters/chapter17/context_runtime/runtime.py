@@ -1,9 +1,25 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from hashlib import sha256
+from math import sqrt
 from typing import Dict, List
+import re
 
 
 def estimate_tokens(text: str) -> int:
     return max(1, sum(1 if ord(char) > 127 else 0.25 for char in text))
+
+
+def _embed(text: str, dimensions: int = 48) -> List[float]:
+    vector = [0.0] * dimensions
+    for token in re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]", text.lower()):
+        digest = sha256(token.encode("utf-8")).digest()
+        vector[int.from_bytes(digest[:2], "big") % dimensions] += 1.0
+    norm = sqrt(sum(value * value for value in vector)) or 1.0
+    return [value / norm for value in vector]
+
+
+def _relevance(query: str, content: str) -> float:
+    return sum(a * b for a, b in zip(_embed(query), _embed(content)))
 
 
 @dataclass(frozen=True)
@@ -58,3 +74,10 @@ class ContextAssembler:
             total += item.tokens
             section_used[item.section] = section_used.get(item.section, 0) + item.tokens
         return AssemblyResult(selected, dropped)
+
+    def assemble_for(self, query: str, items: List[ContextItem]) -> AssemblyResult:
+        ranked = [
+            replace(item, priority=item.priority + int(max(0.0, _relevance(query, item.content)) * 100))
+            for item in items
+        ]
+        return self.assemble(ranked)

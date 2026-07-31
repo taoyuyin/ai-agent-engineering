@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Dict
 
 
 @dataclass(frozen=True)
@@ -38,4 +38,25 @@ class ObservationBuilder:
             result.source,
             False,
             retryable,
+        )
+
+    def from_mcp(
+        self,
+        call_id: str,
+        tool_name: str,
+        result: Dict[str, object],
+        source: str,
+    ) -> Observation:
+        is_error = bool(result.get("isError", False))
+        payload = result.get("structuredContent", result.get("content"))
+        error_code = str(result.get("errorCode", "MCP_TOOL_ERROR" if is_error else ""))
+        return self.build(
+            ToolResult(
+                call_id=call_id,
+                tool_name=tool_name,
+                ok=not is_error,
+                payload=payload,
+                source=source,
+                error_code=error_code,
+            )
         )

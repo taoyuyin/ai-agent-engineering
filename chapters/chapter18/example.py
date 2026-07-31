@@ -11,7 +11,16 @@ def main() -> None:
         payload={"region": "east", "revenue": 218000},
         source="warehouse.sales_monthly",
     )
-    print(ObservationBuilder(max_chars=120).build(raw))
+    builder = ObservationBuilder(max_chars=120)
+    print(builder.build(raw))
+    print(
+        builder.from_mcp(
+            "call-8",
+            "query_sales",
+            {"structuredContent": {"region": "east", "revenue": 218000}, "isError": False},
+            "mcp://analytics/query_sales",
+        )
+    )
 
 
 if __name__ == "__main__":

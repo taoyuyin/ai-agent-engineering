@@ -21,6 +21,8 @@
 
 ## Part III Agent Architecture —— Agent 内部如何工作
 
+本部分把 Part II 的 Token、Embedding、Context、Reasoning、Function Calling 和 MCP 投射到 Agent Runtime；每章同时给出确定性控制边界与完整 Python MVP。
+
 - [Chapter 12 Agent 生命周期](chapter12/README.md)
 - [Chapter 13 Goal](chapter13/README.md)
 - [Chapter 14 Planner](chapter14/README.md)

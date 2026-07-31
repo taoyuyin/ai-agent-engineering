@@ -110,6 +110,22 @@ Prompt Cache 优化计算，不减少 Context 占用；Checkpoint 保存状态�
 
 Context 评估集应保存“必须包含”和“必须排除”的信息。
 
+## Part II 能力在本章中的应用
+
+Context Compiler 是 Token、Embedding 和 Context Window 的汇合点：
+
+```text
+Memory / Knowledge / Tools / Observations
+        ↓ embedding + metadata retrieval
+Authorized Candidates
+        ↓ rerank + section quota + token budget
+Model Context + Context Manifest
+```
+
+Embedding 负责候选召回；reranker 判断当前 Step 相关性；section quota 防止 History 挤掉 Policy、Goal 和 Evidence；token estimator 为输出预留窗口。Prompt Cache 只减少重复计算，不会扩大 Context Window。
+
+本章示例保留 section budget、trusted/untrusted 边界和 dropped reason，展示候选集合到模型请求的确定性编译。
+
 ## 17.7 业务案例：企业知识 Agent
 
 用户询问报销制度时：

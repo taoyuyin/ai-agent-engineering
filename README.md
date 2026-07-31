@@ -57,6 +57,8 @@ ai-agent-engineering/
 
 ### Part III Agent Architecture —— Agent 内部如何工作
 
+把 Part II 的 Token、Embedding、Context、Reasoning、Function Calling 和 MCP 应用到 Agent Runtime，并通过逐章 Python MVP 构建完整企业级架构。
+
 - [Chapter 12 Agent 生命周期](chapters/chapter12/README.md)
 - [Chapter 13 Goal](chapters/chapter13/README.md)
 - [Chapter 14 Planner](chapters/chapter14/README.md)

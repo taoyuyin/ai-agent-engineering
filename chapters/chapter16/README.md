@@ -102,6 +102,23 @@ Memory 是高风险数据面：
 
 最低要求是 tenant/subject namespace、数据分类、TTL、加密、访问审计和删除接口。Tool Result 中的指令不应自动写成 Procedural Memory。
 
+## Part II 能力在本章中的应用
+
+Embedding 只负责 Memory 候选召回，Memory Runtime 负责完整读写治理：
+
+```text
+Write: Event → Write Policy → Normalize → Embed
+             → Metadata + Vector + Version
+
+Read:  Task → Query Embedding → Tenant/Subject Filter
+             → Semantic + Confidence Rank
+             → Context Candidate
+```
+
+Token/Context 决定最终装入多少 Memory；Embedding 模型版本应随索引记录；升级时采用双索引或重建；删除同时传播到事实存储与向量索引。
+
+本章示例将租户/主体过滤放在评分之前，并组合词项、语义相似度和 confidence，说明 Vector DB 是索引而不是 Memory 本身。
+
 ## 16.7 业务案例：客户服务 Agent
 
 可保存：
@@ -145,7 +162,7 @@ MVP 实现 memory type、tenant/subject namespace、置信度、版本更新、�
 
 ## Notes
 
-本章的 Store 是教学实现，不使用 Embedding。向量数据库选型与 Python API 已在 Chapter 7 展开。
+本章使用确定性的轻量 Embedding 演示语义 Memory Retrieval，便于无外部模型运行。真实项目应替换为经过评估的 Embedding 模型并记录模型版本；向量数据库选型与 Python API 已在 Chapter 7 展开。
 
 ## References
 

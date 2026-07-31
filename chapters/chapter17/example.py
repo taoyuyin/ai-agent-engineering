@@ -10,7 +10,7 @@ def main() -> None:
         ContextItem("e1", "evidence", "华东收入较上月下降 12%", 90, True),
         ContextItem("h1", "history", "此前用户询问过华南数据" * 20, 10, False),
     ]
-    result = ContextAssembler(policy).assemble(items)
+    result = ContextAssembler(policy).assemble_for("分析华东收入异常", items)
     print(result.render())
     print(result.dropped)
 

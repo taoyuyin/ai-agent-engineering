@@ -103,6 +103,22 @@ failed step
 
 Airflow 的 DAG 拓扑适合相对稳定的依赖；Agent 的动态步骤更适合状态图或在 Workflow Activity 内部运行。
 
+## Part II 能力在本章中的应用
+
+Reasoning Model 可以提出计划，但 Planner Runtime 必须将它编译为可验证的 Plan IR：
+
+```text
+Goal + Observation + Context Budget
+        ↓ reasoning
+Structured Plan Proposal
+        ↓ dependency / scope / budget validation
+Executable DAG + Ready Queue
+```
+
+Function Calling 或 Structured Output 提供 step、dependency 和 expected evidence；Token Budget 限制计划长度；Runtime 拒绝循环依赖、未知能力和超预算步骤，不依赖模型的隐藏思维过程。
+
+本章示例展示依赖计划、ready step、结果写回和 repair，体现“模型提出怎么做，Runtime 判断能不能执行”。
+
 ## 14.7 业务案例：数据质量分析
 
 Goal：定位订单收入下降原因。

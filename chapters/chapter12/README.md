@@ -95,6 +95,20 @@ Running ←───────────────┐
 
 Agent Runner 管理模型循环，Workflow Engine 管理长期可靠执行。企业系统常将前者作为后者的一个 Activity，而不是二选一。
 
+## Part II 能力在本章中的应用
+
+生命周期是底层能力的总预算边界，而不是简单的状态枚举：
+
+| 底层能力 | 生命周期中的应用 |
+|---|---|
+| Token | 输入、输出、累计 usage 与超限终止 |
+| Context | 每个 Step 只读取当前 checkpoint 和必要上下文 |
+| Reasoning | 规划和反思有次数、时间与费用上限 |
+| Function Calling | 模型提出 tool call，Run 进入执行或等待状态 |
+| MCP | 远程调用可能超时、断连，需要恢复和幂等 |
+
+完整链路是 `request → validate → plan → context → model → tool/MCP → observation → evaluate → terminal`。示例中的 Run、step budget 和事件记录形成确定性外壳；生产实现还应把 token、deadline 和 cost usage 写入同一 Run Budget。
+
 ## 12.6 业务案例：采购审批 Agent
 
 采购 Agent 生成供应商建议后必须暂停，等待预算负责人批准。正确设计：

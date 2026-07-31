@@ -105,6 +105,22 @@ Created → Planning → Ready → Running
 
 LangGraph 更接近 Agent state graph；Temporal 更接近 durable execution substrate。二者可以集成。
 
+## Part II 能力在本章中的应用
+
+模型、Function Calling 和 MCP 都只能产生事件候选，不能直接修改状态：
+
+```text
+Model Command / ToolResult / MCP Error
+        ↓ validate and classify
+Domain Event
+        ↓ legal transition + invariant
+New State + Checkpoint
+```
+
+Context 从 checkpoint 投影，而不是把聊天记录当状态；token usage、tool call ID 和 model version 作为 event metadata 保存；Reasoning 可以建议下一事件，但 State Machine 决定是否合法。
+
+本章示例用不可变事件、合法转移、expected sequence 和 replay，展示如何把非确定模型装入确定状态边界。
+
 ## 20.7 业务案例：退款 Agent
 
 ```text

@@ -106,6 +106,22 @@ Runtime 应检测：
 
 达到阈值应降级、澄清或升级人工，而不是继续生成。
 
+## Part II 能力在本章中的应用
+
+Reflection 使用 Reasoning，但必须由验证信号触发并受预算约束：
+
+```text
+Observation + Success Criteria
+        ↓ deterministic / model evaluator
+Failure Category
+        ↓ structured repair decision
+retry | repair_arguments | replan | abort | escalate
+```
+
+Context 只提供失败步骤、相关证据和约束；Token/Cost Budget 限制反思次数；Structured Output 把模型建议限制为允许的 repair action。权限失败不能靠“再想一次”修复。
+
+本章示例将错误代码映射到确定动作，并按 step 记录 retry budget，使 reasoning 成为有边界的诊断能力。
+
 ## 19.7 业务案例：Coding Agent
 
 补丁编译失败：

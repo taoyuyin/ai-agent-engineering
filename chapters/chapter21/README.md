@@ -104,6 +104,23 @@ Temporal 使用 Event History replay，要求 Workflow 决策确定性，并将�
 
 选型先看任务生命周期和恢复要求，再看模型 SDK。
 
+## Part II 能力在本章中的应用
+
+Workflow 把模型与 Tool/MCP 调用当作可恢复 Task，而不是普通函数：
+
+```text
+Deterministic DAG
+├── build_context      Token/Context Budget
+├── model_plan         Reasoning + Structured Output
+├── call_tool          Function Calling / MCP
+├── normalize          Observation
+└── approval/publish   Human Gate
+```
+
+模型 Task 固定 Prompt、模型、输入快照和预算；MCP Task 保存 call ID、幂等键和错误分类；Checkpoint 只存可恢复状态。Workflow 管理何时执行，Agent 处理无法预先写死的决策。
+
+本章示例包含 DAG、state propagation、有限重试和人工审批暂停/恢复，是模型外部的完整确定性外壳。
+
 ## 21.7 业务案例：月度经营报告
 
 ```text

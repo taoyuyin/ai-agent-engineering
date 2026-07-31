@@ -15,6 +15,14 @@ class LifecycleTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             LifecycleEngine().transition(AgentRun("1", "goal"), RunStatus.COMPLETED, "skip")
 
+    def test_token_budget_terminates_run(self) -> None:
+        run = AgentRun("1", "goal", max_tokens=10)
+        engine = LifecycleEngine()
+        engine.transition(run, RunStatus.VALIDATING, "ok")
+        engine.record_model_usage(run, 8, 4)
+        self.assertEqual(RunStatus.FAILED, run.status)
+        self.assertEqual("token_budget_exhausted", run.events[-1]["reason"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -123,6 +123,21 @@ Task Envelope 应包含：
 
 进程内子 Agent 不必为了“标准化”强行使用网络协议。跨团队、跨平台和远程 Agent 才更需要 A2A 类协议。
 
+## Part II 能力在本章中的应用
+
+Multi-Agent 把 Tool Discovery 扩展为 Agent Discovery：
+
+```text
+Task Objective → Embedding/Capability Search → Top-K Agent Cards
+              → Scope/Budget/Health Filter → Delegation Envelope
+              → bounded Context + structured call
+              → evidence + confidence + trace → Resolution
+```
+
+Embedding 召回描述不同的专业 Agent；Context 只委派必要目标、证据和最小 scope；Token/Cost 限制 fan-out；Function Calling、MCP 或 A2A 承担结构化通信。语义相似度不能替代权限和责任边界。
+
+本章示例增加语义 Agent Discovery，并保留 capability、scope、delegation budget 与 evidence contract。
+
 ## 22.9 业务案例：经营分析团队
 
 Coordinator 将同一数据 snapshot 下的子任务交给 Sales、Inventory、Service Agent。每个 Agent 只访问本领域数据，返回 `EvidenceReport`。合并器检查时间窗口和指标定义一致，再生成综合结论。发布仍由确定性 Workflow 和管理者审批。

@@ -112,6 +112,22 @@ Success Criterion 应满足：
 
 若 Goal 直接包含固定执行步骤，它可能已经是 Workflow；若 Planner 可以修改成功标准，边界就失控了。
 
+## Part II 能力在本章中的应用
+
+Goal Compiler 消费模型能力，但不把自然语言直接当作执行合同：
+
+```text
+User Request + Identity + Context
+        ↓ reasoning / extraction
+Structured Goal Proposal
+        ↓ schema + policy validation
+GoalSpec
+```
+
+Token/Context 决定澄清材料的范围，Reasoning 识别隐含约束，Structured Output 把结果限制为 `GoalSpec`。Runtime 再验证 success criteria、allowed tools 和 risk level，并同时保留原始请求与编译结果。
+
+本章示例把结构化模型提案编译成 GoalSpec，再用独立 Evaluator 对证据验收；模型负责理解，Runtime 负责合同。
+
 ## 13.7 业务案例：客服退款
 
 用户说“给这个客户退钱”。Goal Compiler 应补齐：
