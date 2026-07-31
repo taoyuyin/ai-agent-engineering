@@ -1,22 +1,24 @@
 # AI Agent Engineering
 
-AI Agent Engineering 是一个面向工程实践的 AI Agent 系列教程与源码仓库。
+AI Agent Engineering 是一本持续更新的企业级 AI Agent 工程教材，也是一套配套源码工程。
 
-这个项目会从最小可运行的 Agent 开始，逐步覆盖工具调用、规划、记忆、工作流、RAG、浏览器自动化、多 Agent 协作、评测与部署等主题。
+这个项目从“为什么需要 Agent”开始，逐步覆盖 LLM 基础、Agent Architecture、企业级工程能力、主流框架设计、企业实践和下一代软件形态。
 
 ## 项目目标
 
-- 用源码解释 AI Agent 的核心机制，而不是只停留在概念层
-- 构建一个可教学、可扩展的 Agent Runtime
-- 提供完整案例，展示 Agent 在真实任务中的工程落地方式
-- 沉淀提示词、数据集、评测方法和架构图，方便复用与二次开发
+- 理解 Agent 为什么出现
+- 理解 LLM 为什么让 Agent 成为可能
+- 自己实现一个教学版 Agent Runtime
+- 用 Python 示例解释核心工程抽象
+- 分析主流 Agent 框架的设计思想，而不是只学习 API
+- 面向企业场景讨论安全、评测、部署、治理和平台化
 
 ## 目录结构
 
 ```text
 ai-agent-engineering/
 ├── docs/                    # 教材配套文档
-├── chapters/                # 每章源码
+├── chapters/                # 每章正文与源码
 ├── examples/                # 完整案例
 ├── framework/               # 自己实现 Agent Runtime
 ├── integrations/            # 模型与服务集成
@@ -29,18 +31,87 @@ ai-agent-engineering/
 └── scripts/                 # 工具脚本
 ```
 
-## 推荐阅读路径
-
-1. `chapters/chapter01`：从一个最小 Agent 开始
-2. `framework/`：理解 Agent Runtime 的核心组件
-3. `examples/`：阅读完整应用案例
-4. `evaluation/`：学习如何评测 Agent 的效果
-5. `architecture/`：补齐工程架构、部署和企业级设计
-
 ## 项目文档
 
 - [写作规范](docs/writing-guidelines.md)
 - [项目路线图](docs/roadmap.md)
+
+## 全文章节
+
+### Part I Foundations —— 为什么需要 AI Agent
+
+- [Chapter 1 软件为什么需要 AI Agent？](chapters/chapter01/README.md)
+- [Chapter 2 软件架构为什么不断演进？](chapters/chapter02/README.md)
+- [Chapter 3 什么是真正的 AI Agent？](chapters/chapter03/README.md)
+- [Chapter 4 Agent 与 Workflow 的区别](chapters/chapter04/README.md)
+
+### Part II LLM Foundations —— Agent 为什么能够工作
+
+- [Chapter 5 Transformer](chapters/chapter05/README.md)
+- [Chapter 6 Token](chapters/chapter06/README.md)
+- [Chapter 7 Embedding](chapters/chapter07/README.md)
+- [Chapter 8 Context](chapters/chapter08/README.md)
+- [Chapter 9 Reasoning](chapters/chapter09/README.md)
+- [Chapter 10 Function Calling](chapters/chapter10/README.md)
+- [Chapter 11 MCP](chapters/chapter11/README.md)
+
+### Part III Agent Architecture —— Agent 内部如何工作
+
+- [Chapter 12 Agent 生命周期](chapters/chapter12/README.md)
+- [Chapter 13 Goal](chapters/chapter13/README.md)
+- [Chapter 14 Planner](chapters/chapter14/README.md)
+- [Chapter 15 Tool](chapters/chapter15/README.md)
+- [Chapter 16 Memory](chapters/chapter16/README.md)
+- [Chapter 17 Context Engineering](chapters/chapter17/README.md)
+- [Chapter 18 Observation](chapters/chapter18/README.md)
+- [Chapter 19 Reflection](chapters/chapter19/README.md)
+- [Chapter 20 State Machine](chapters/chapter20/README.md)
+- [Chapter 21 Workflow Engine](chapters/chapter21/README.md)
+- [Chapter 22 Multi-Agent](chapters/chapter22/README.md)
+- [Chapter 23 Agent Architecture](chapters/chapter23/README.md)
+
+### Part IV Agent Engineering —— 如何构建企业级 Agent
+
+- [Chapter 24 Prompt Engineering](chapters/chapter24/README.md)
+- [Chapter 25 Knowledge Engineering](chapters/chapter25/README.md)
+- [Chapter 26 RAG](chapters/chapter26/README.md)
+- [Chapter 27 Semantic Layer](chapters/chapter27/README.md)
+- [Chapter 28 Guardrails](chapters/chapter28/README.md)
+- [Chapter 29 Evaluation](chapters/chapter29/README.md)
+- [Chapter 30 Observability](chapters/chapter30/README.md)
+- [Chapter 31 Performance](chapters/chapter31/README.md)
+- [Chapter 32 Cost Optimization](chapters/chapter32/README.md)
+- [Chapter 33 Deployment](chapters/chapter33/README.md)
+
+### Part V Frameworks —— 主流 Agent 框架设计
+
+- [Chapter 34 OpenAI Agents SDK](chapters/chapter34/README.md)
+- [Chapter 35 LangGraph](chapters/chapter35/README.md)
+- [Chapter 36 Google ADK](chapters/chapter36/README.md)
+- [Chapter 37 CrewAI](chapters/chapter37/README.md)
+- [Chapter 38 AutoGen](chapters/chapter38/README.md)
+- [Chapter 39 PydanticAI](chapters/chapter39/README.md)
+- [Chapter 40 LlamaIndex](chapters/chapter40/README.md)
+- [Chapter 41 Dify](chapters/chapter41/README.md)
+
+### Part VI Enterprise Practice —— 企业实践
+
+- [Chapter 42 SQL Agent](chapters/chapter42/README.md)
+- [Chapter 43 Data Agent](chapters/chapter43/README.md)
+- [Chapter 44 BI Agent](chapters/chapter44/README.md)
+- [Chapter 45 Coding Agent](chapters/chapter45/README.md)
+- [Chapter 46 Enterprise Knowledge Agent](chapters/chapter46/README.md)
+- [Chapter 47 Customer Service Agent](chapters/chapter47/README.md)
+- [Chapter 48 Manufacturing Agent](chapters/chapter48/README.md)
+- [Chapter 49 Multi-Agent 企业平台](chapters/chapter49/README.md)
+
+### Part VII Future —— 下一代软件
+
+- [Chapter 50 Agent Platform](chapters/chapter50/README.md)
+- [Chapter 51 Agent Operating System](chapters/chapter51/README.md)
+- [Chapter 52 Computer Use](chapters/chapter52/README.md)
+- [Chapter 53 AI Native Software](chapters/chapter53/README.md)
+- [Chapter 54 Future of Software Engineering](chapters/chapter54/README.md)
 
 ## 开发环境
 
@@ -58,20 +129,23 @@ python -m pip install -U pip
 python chapters/chapter01/minimal_agent.py
 ```
 
-## 内容规划
+运行任意章节示例：
 
-- Chapter 01：什么是 Agent：最小循环
-- Chapter 02：工具调用：让 Agent 连接外部世界
-- Chapter 03：Planner：任务拆解与执行计划
-- Chapter 04：Memory：短期记忆与长期记忆
-- Chapter 05：Workflow：可控流程与 Agent 自主性的边界
-- Chapter 06：RAG Agent：检索增强生成
-- Chapter 07：Browser Agent：浏览器自动化
-- Chapter 08：Coding Agent：代码生成、修改与验证
-- Chapter 09：Multi-Agent：协作、分工与冲突处理
-- Chapter 10：Evaluation：如何评测 Agent
-- Chapter 11：Deployment：从 Demo 到生产系统
-- Chapter 12：Enterprise Agent：权限、审计、安全与治理
+```bash
+python chapters/chapter05/example.py
+```
+
+## 核心路线
+
+本项目坚持：
+
+```text
+Agent Runtime
+  ↓
+OpenAI Agents SDK / LangGraph / Google ADK / CrewAI / AutoGen / Dify
+```
+
+先理解并实现 Agent Runtime，再学习成熟框架为什么这样设计。
 
 ## License
 
