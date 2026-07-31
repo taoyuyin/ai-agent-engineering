@@ -8,95 +8,152 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Embedding` 在 AI Agent Engineering 中到底解决什么问题？
+为什么向量可以表达语义？Embedding 在 Agent 中到底用在哪里？
 
 ## Chapter Conclusion
 
-Embedding 把离散文本映射到连续向量空间，让语义相似性可以被计算。
+Embedding 把文本、文档、问题、指标和工具描述映射到向量空间，使“语义相似”可以被计算。
+
+对 Agent 工程而言，Embedding 是 RAG、Memory Retrieval、Tool Selection 和知识路由的重要基础。
 
 ## Learning Objectives
 
 完成本章后，你应该能够理解：
 
-- 语义向量
-- Embedding 空间
-- 相似度
-- 检索
-- RAG 与 Agent
+- Embedding 的基本直觉
+- 余弦相似度如何衡量语义接近
+- Embedding 如何支持检索
+- Agent Memory 为什么需要 Retrieval
+- Embedding 的局限性和治理要求
 
-## 本章定位
+## 7.1 原理剖析：从离散文本到连续空间
 
-本章属于 `Part II LLM Foundations`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+文本本身是离散符号。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+```text
+"销售额"
+"收入"
+"revenue"
+```
 
-## 主要内容
+对业务人员来说，它们可能表达相近含义。但字符串匹配很难直接知道这一点。
 
-### 7.1 语义向量
+Embedding 的作用，是把这些文本映射成向量：
 
-语义向量 是本章理解 `Embedding` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+```text
+"销售额" → [0.21, 0.72, ...]
+"收入"   → [0.20, 0.69, ...]
+```
 
-在实际系统中，`语义向量` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+如果两个文本语义相近，它们在向量空间中的方向通常也更接近。
 
-### 7.2 Embedding 空间
+这让语义检索成为可能。
 
-Embedding 空间 是本章理解 `Embedding` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+## 7.2 相似度：为什么常用 cosine
 
-在实际系统中，`Embedding 空间` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+在向量空间中，我们通常不只关心向量长度，而更关心方向。
 
-### 7.3 相似度
+Cosine Similarity 衡量两个向量夹角：
 
-相似度 是本章理解 `Embedding` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+```text
+cosine(a, b) = dot(a, b) / (|a| * |b|)
+```
 
-在实际系统中，`相似度` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+值越接近 1，方向越相似。
 
-### 7.4 检索
+在 Agent 中，这常用于：
 
-检索 是本章理解 `Embedding` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- 找最相关文档
+- 找最相关记忆
+- 找最合适工具
+- 找相似历史任务
 
-在实际系统中，`检索` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 7.3 架构设计：Embedding Retrieval
 
-### 7.5 RAG 与 Agent
+一个最小检索架构：
 
-RAG 与 Agent 是本章理解 `Embedding` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+```text
+Documents
+  ↓
+Chunk
+  ↓
+Embed
+  ↓
+Vector Store
+  ↓
+User Query
+  ↓
+Query Embedding
+  ↓
+Top-K Retrieval
+  ↓
+Agent Context
+```
 
-在实际系统中，`RAG 与 Agent` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+注意，Embedding 不直接回答问题。
 
-## Python 示例
+它只负责找相关内容。最终答案仍需要 LLM 结合上下文生成。
 
-本章配套示例见：
+## 7.4 工具横向对比
+
+| 工具 / 框架 | Embedding 相关能力 | 适用场景 |
+|---|---|---|
+| OpenAI Embeddings | 通用文本向量 | 文档检索、分类、聚类 |
+| LlamaIndex | Index / Retriever 抽象成熟 | RAG 和知识库 |
+| LangChain / LangGraph | Retriever 可接入 Agent 流程 | 多步 Agent 检索 |
+| 向量数据库 | 存储和召回 embedding | 大规模知识库 |
+| 本书 framework | 先实现内存向量检索 | 理解原理和接口边界 |
+
+## 7.5 业务场景案例：企业指标问答
+
+用户问：
+
+```text
+GMV 和销售额有什么区别？
+```
+
+系统需要从指标字典中找：
+
+- GMV 定义
+- 销售额定义
+- 口径差异
+- 适用报表
+- 负责人
+
+关键词匹配可能漏掉“成交总额”“支付金额”等同义表达。
+
+Embedding 检索可以提高召回能力，但仍需要 Semantic Layer 确认指标口径。
+
+## Python MVP
+
+本章示例实现一个极简 embedding 检索器。
+
+为了不依赖外部模型，示例使用词袋向量模拟 embedding。真实系统应替换为模型 embedding。
+
+运行：
 
 ```bash
 python chapters/chapter07/example.py
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
-
-## Engineering Notes
-
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
-
 ## Summary
 
-Embedding 把离散文本映射到连续向量空间，让语义相似性可以被计算。
+Embedding 让语义相似性可计算，是 RAG、Memory、Tool Selection 和企业知识检索的基础。
 
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+但 Embedding 不是业务语义真相。企业场景中仍然需要指标定义、权限、数据质量和人工治理。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+本章示例只展示向量检索接口和 cosine similarity。真实项目应使用可靠 embedding 模型和向量数据库。
 
 ## References
 
 [1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+Embeddings Guide.  
+https://platform.openai.com/docs/guides/embeddings
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
+[2] LlamaIndex.  
+Documentation.  
+https://docs.llamaindex.ai/
 
 以上 URL 已在 2026-07-31 验证可访问。

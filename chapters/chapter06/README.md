@@ -8,95 +8,182 @@ Last Updated: 2026-07-31
 
 ## Core Question
 
-本章要回答：`Token` 在 AI Agent Engineering 中到底解决什么问题？
+为什么 Token 不是字符？为什么 Agent 工程师必须理解 Token？
 
 ## Chapter Conclusion
 
-Token 是模型处理文本的基本单位，也是成本、上下文和输出控制的基础。
+Token 是 LLM 处理文本的基本单位，也是上下文窗口、成本估算、输出控制和工具参数设计的基础。
+
+对 Agent 工程而言，Token 决定了：
+
+- 一次请求能放多少上下文
+- 长文档为什么必须 chunk
+- 工具结果为什么要压缩
+- 成本为什么和输入输出规模相关
+- JSON 输出为什么需要 schema 和长度控制
 
 ## Learning Objectives
 
 完成本章后，你应该能够理解：
 
-- Tokenizer
-- BPE
-- Token 不是字符
-- Token 与成本
-- Token 与上下文
+- Token 与字符、单词的区别
+- BPE 的基本思想
+- Token budget 如何影响 Agent Context
+- 为什么工具返回结果不能无限长
+- 如何在代码中做简化版 token 估算
 
-## 本章定位
+## 6.1 原理剖析：Token 不是字符
 
-本章属于 `Part II LLM Foundations`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+LLM 不直接处理字符串。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+在进入模型之前，文本会先经过 Tokenizer，被切分成 token id 序列。
 
-## 主要内容
+例如：
 
-### 6.1 Tokenizer
+```text
+"AI Agent Engineering"
+  ↓
+["AI", " Agent", " Engineering"]
+  ↓
+[token_id_1, token_id_2, token_id_3]
+```
 
-Tokenizer 是本章理解 `Token` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+Token 可能是一个字符、一个词、一个词的一部分，也可能包含前导空格。
 
-在实际系统中，`Tokenizer` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+这就是为什么同样长度的中文、英文、代码、JSON，token 数可能完全不同。
 
-### 6.2 BPE
+对 Agent 来说，这件事非常实际：
 
-BPE 是本章理解 `Token` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- 用户问题占 token
+- 系统提示词占 token
+- 工具说明占 token
+- 工具结果占 token
+- 历史消息占 token
+- 模型输出也占 token
 
-在实际系统中，`BPE` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+所以 Agent Runtime 必须管理 token budget。
 
-### 6.3 Token 不是字符
+## 6.2 BPE 的基本思想
 
-Token 不是字符 是本章理解 `Token` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+BPE（Byte Pair Encoding）的直觉是：
 
-在实际系统中，`Token 不是字符` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+从小单位开始，不断把高频相邻片段合并成更大的 token。
 
-### 6.4 Token 与成本
+例如：
 
-Token 与成本 是本章理解 `Token` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+```text
+l o w
+l o w e r
+n e w e s t
+```
 
-在实际系统中，`Token 与成本` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+如果 `l + o` 经常一起出现，就合并为 `lo`。
 
-### 6.5 Token 与上下文
+如果 `lo + w` 经常出现，就合并为 `low`。
 
-Token 与上下文 是本章理解 `Token` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+最终，常见词会被切成较少 token，罕见词会被拆成更小片段。
 
-在实际系统中，`Token 与上下文` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+这让模型可以处理开放词表，同时控制词表规模。
 
-## Python 示例
+## 6.3 架构设计：Token Budget
 
-本章配套示例见：
+一个 Agent 请求的上下文可以理解为：
+
+```text
+System Prompt
+  +
+Developer Instructions
+  +
+User Goal
+  +
+Tool Definitions
+  +
+Memory
+  +
+Retrieved Knowledge
+  +
+Tool Results
+  +
+Output Budget
+```
+
+如果总 token 超过模型 context window，请求就会失败，或者必须截断。
+
+因此，Agent Runtime 需要一个 Context Budget Manager：
+
+```text
+Input Sources
+  ↓
+Token Estimate
+  ↓
+Priority Ranking
+  ↓
+Compression / Truncation
+  ↓
+Final Context
+```
+
+## 6.4 工具横向对比
+
+| 工具 / 框架 | Token 相关能力 | 工程关注点 |
+|---|---|---|
+| OpenAI API | 模型上下文、输入输出 token、结构化输出 | 控制 prompt、tool result、output budget |
+| Anthropic Claude | 长上下文能力突出 | 长文档仍需组织和引用管理 |
+| LlamaIndex | Chunk、Index、Retriever | 把长文档切成可检索片段 |
+| LangGraph | 状态和消息管理 | 避免 graph state 无限膨胀 |
+| 本书 framework | 简化 Token Budget Manager | 先做估算、裁剪和优先级 |
+
+## 6.5 业务场景案例：企业知识库问答
+
+用户问：
+
+```text
+根据公司差旅制度，上海到北京出差高铁二等座能不能报销？
+```
+
+Agent 可能检索到 20 段制度文本。
+
+如果全部塞进上下文：
+
+- 成本上升
+- 延迟上升
+- 模型可能关注无关片段
+- 输出可能引用错误条款
+
+更合理的做法是：
+
+- 先估算 token
+- 按相关性排序
+- 保留最相关片段
+- 对过长片段做摘要
+- 给输出保留预算
+
+## Python MVP
+
+本章示例实现一个简化 BPE Tokenizer 和 token budget 裁剪器。
+
+运行：
 
 ```bash
 python chapters/chapter06/example.py
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
-
-## Engineering Notes
-
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
-
 ## Summary
 
-Token 是模型处理文本的基本单位，也是成本、上下文和输出控制的基础。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
+Token 是 LLM 的输入输出单位。Agent 工程师不需要实现工业级 tokenizer，但必须理解 token budget 对上下文、成本、延迟和工具结果设计的影响。
 
 ## Notes
 
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+本章示例是教学版 tokenizer，不等价于任何真实模型 tokenizer。真实项目应使用模型供应商或开源库提供的 tokenizer。
 
 ## References
 
-[1] OpenAI.  
+[1] Sennrich et al.  
+Neural Machine Translation of Rare Words with Subword Units.  
+https://arxiv.org/abs/1508.07909
+
+[2] OpenAI.  
 A Practical Guide to Building Agents.  
 https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
-
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
 
 以上 URL 已在 2026-07-31 验证可访问。
