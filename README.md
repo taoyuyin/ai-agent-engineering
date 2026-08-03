@@ -35,8 +35,15 @@ ai-agent-engineering/
 
 - [写作规范](docs/writing-guidelines.md)
 - [项目路线图](docs/roadmap.md)
+- [章节与源码导航](chapters/README.md)
 - [Agent Runtime 工程说明](framework/README.md)
 - [Agent Runtime 架构](framework/ARCHITECTURE.md)
+- [统一架构视图](architecture/README.md)
+- [完整案例状态与规范](examples/README.md)
+- [模型集成适配契约](integrations/README.md)
+- [评测方法](evaluation/README.md)
+- [基准实验规范](benchmark/README.md)
+- [数据集治理规范](datasets/README.md)
 - [SQL Agent 完整案例](examples/sql-agent/README.md)
 
 ## 全文章节
@@ -202,4 +209,4 @@ AutoGen / PydanticAI / LlamaIndex / Dify
 
 ## License
 
-待定。
+本仓库当前尚未发布开源 License 文件。在 License 明确之前，代码和文档不应被视为已获得通用复制、修改或分发授权；后续选择许可证时需要同时评估教材内容、示例代码和第三方数据/依赖的授权边界。
