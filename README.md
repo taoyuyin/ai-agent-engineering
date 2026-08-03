@@ -116,6 +116,8 @@ ai-agent-engineering/
 
 ### Part VII Future —— 下一代软件
 
+本部分不把尚未成熟的概念写成既定事实，而是从当前可验证的工程能力出发，讨论 Agent Platform、工作负载调度、Computer Use、AI Native 架构和人机协作开发。五章均提供标准库离线 MVP，用确定性控制面验证未来架构中的关键边界。
+
 - [Chapter 50 Agent Platform](chapters/chapter50/README.md)
 - [Chapter 51 Agent Operating System](chapters/chapter51/README.md)
 - [Chapter 52 Computer Use](chapters/chapter52/README.md)
@@ -170,6 +172,16 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python example.py "住宿费超过 800 元如何报销？"
+```
+
+运行 Part VII 的 Agent Platform 发布与路由 MVP：
+
+```bash
+cd chapters/chapter50
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python example.py
 ```
 
 ## 核心路线

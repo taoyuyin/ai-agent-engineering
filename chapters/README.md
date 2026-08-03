@@ -99,6 +99,16 @@
 
 ## Part VII Future —— 下一代软件
 
+本部分以“当前能力、架构抽象、趋势判断”三层组织未来议题，避免用产品口号替代工程边界。每章都通过离线 Python MVP 验证一个可以落地的控制面。
+
+| Chapter | 未来议题 | MVP 验证重点 |
+| --- | --- | --- |
+| 50 Agent Platform | 多团队 Agent 交付与治理 | Manifest、Release Gate、Registry、Routing |
+| 51 Agent Operating System | 有状态工作负载与资源抽象 | Filter/Score、Token 预留、Capability Token |
+| 52 Computer Use | GUI Observation–Action Loop | Domain/Action Policy、敏感输入确认 |
+| 53 AI Native Software | Goal-driven Capability Composition | 依赖规划、预算、副作用、动态 UI |
+| 54 Future of Software Engineering | 人机协作的软件供应链 | Provenance、Evidence、Trust Gate |
+
 - [Chapter 50 Agent Platform](chapter50/README.md)
 - [Chapter 51 Agent Operating System](chapter51/README.md)
 - [Chapter 52 Computer Use](chapter52/README.md)

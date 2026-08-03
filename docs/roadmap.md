@@ -1,8 +1,8 @@
 # Roadmap
 
-Version: 2026-07
+Version: 2026-08
 
-Last Updated: 2026-07-28
+Last Updated: 2026-08-03
 
 ## 项目愿景
 
@@ -542,19 +542,50 @@ SQL / Data / BI
 
 ## Part VII Future —— 下一代软件
 
-目标：讨论 Agent 对软件工程和软件形态的长期影响。
+目标：从当前可验证的 Agent 工程能力出发，讨论下一代运行平台、交互方式、软件架构和研发范式。
+
+这一部分的写作规则：
+
+1. 区分当前能力、架构抽象和趋势预测；
+2. 趋势判断注明时间尺度、置信度和关键假设；
+3. 优先引用协议、官方文档、研究报告和论文等一手资料；
+4. 不为尚未出现的产品编造 API，MVP 验证可落地的控制面；
+5. 延续全书边界：模型提出候选，确定性 Runtime、Policy 和 Evidence 决定执行。
+
+| Chapter | 核心问题 | Python MVP |
+| --- | --- | --- |
+| 50 Agent Platform | 多团队如何复用、发布和治理 Agent | Manifest、Release Gate、Registry、Router |
+| 51 Agent Operating System | Agent 工作负载如何调度、隔离与恢复 | Filter/Score Scheduler、资源预留、Capability |
+| 52 Computer Use | Agent 如何安全操作 GUI | Observation、Action Policy、Human Confirmation |
+| 53 AI Native Software | 软件如何从功能驱动转向目标驱动 | Goal-to-Capability Planner、动态 UI Projection |
+| 54 Future of Software Engineering | 人与 Agent 如何共同交付可信变更 | Change Provenance、Evidence Gate、Trust Score |
 
 ### Chapter 50 Agent Platform
 
-企业为什么最终都会建设 Agent Platform。
+主要内容：
+
+- Agent Application、Runtime 与 Platform 的边界
+- Control Plane、Runtime Plane 和 Data Plane
+- Model Gateway、Registry、Tool/MCP、Knowledge、Eval、Policy、Observability、FinOps
+- Agent Manifest、发布门禁、版本、灰度与回滚
+- SDK、低代码、云托管、自研和混合平台横向比较
+- 从单应用到生态化的平台成熟度模型
+
+输出：Agent Platform 是多团队规模化后的共享交付与治理系统，而不是所有企业的第一步。
 
 ### Chapter 51 Agent Operating System
 
 主要内容：
 
 - Agent OS
-- Agent Runtime
-- Agent 调度与资源管理
+- Agent Runtime、Platform 与 OS 的职责边界
+- Workload Spec、生命周期、Checkpoint 和 Durable Execution
+- Filter/Score 调度与 Token、成本、工具、人工注意力资源模型
+- Capability-based Security 与最小权限委派
+- 与 Kubernetes Scheduler、Workflow Engine 和传统 OS 的类比及边界
+- Context 虚拟化、跨模型迁移和资源计量等开放问题
+
+输出：Agent OS 是有状态 Agent Workload 的架构抽象，当前仍处于概念与实现快速演进期。
 
 ### Chapter 52 Computer Use
 
@@ -562,7 +593,13 @@ SQL / Data / BI
 
 - GUI Agent
 - Browser Agent
-- Computer Use 的工程边界
+- API、DOM、Accessibility、Vision 和 Hybrid 路线对比
+- Observation–Action–Execute–Verify 循环
+- 坐标脆弱性、部分可观测状态、幂等和独立验证
+- Sandbox、Allowlist、Prompt Injection、Secret 与即时人工确认
+- Task Success、Recovery、Unsafe Action、Latency 和 Cost 评测
+
+输出：Computer Use 是无 API 场景的受治理 Tool，生产原则是 API first、GUI fallback。
 
 ### Chapter 53 AI Native Software
 
@@ -570,15 +607,27 @@ SQL / Data / BI
 
 - 什么是 AI Native
 - AI Native 与传统软件的区别
-- AI Native 应用架构
+- Goal、Constraint、Plan、Evidence、Confidence 与 Approval 一等状态
+- Deterministic Core、Intelligence Layer 与 Interaction Projection
+- Capability Contract、动态规划和生成式 UI
+- Context、Memory、模型可替换与降级
+- 传统应用从 AI Feature 到 AI Native Product 的演进路径
+
+输出：AI Native 的本质是目标驱动和能力动态组合，业务不变量仍由确定性核心维护。
 
 ### Chapter 54 Future of Software Engineering
 
 主要内容：
 
 - Agent 对软件工程的影响
-- 开发者角色变化
-- 软件系统从流程驱动到目标驱动
+- Capability、Benchmark、Productivity 与 Business Outcome 的证据边界
+- 软件工作单元从代码转向 Executable Intent + Evidence + Provenance
+- Requirements、Design、Implementation、Verification、Review 和 Operations 的变化
+- Agent-ready Repository 与新软件供应链风险
+- 开发者、架构、测试、平台、安全和产品角色变化
+- 近期、中期和长期预测及置信度
+
+输出：Agent 改变代码生产方式，但可信结果仍依赖更强的软件工程系统。
 
 ## GitHub 工程组织
 
@@ -616,10 +665,10 @@ v1.0 / part-i-complete
 
 读者可以通过 tag 回到某一章对应的代码状态。
 
-## 近期执行优先级
+## 后续执行优先级
 
-1. 完成 Part I 的 4 篇 Foundations 文章。
-2. 为 `chapters/chapter01` 补齐与文章对应的源码和说明。
-3. 建立章节模板，统一 `Learning Objectives / Summary / Notes / References`。
-4. 为每章建立引用验证清单。
-5. 逐步实现 `framework/runtime` 的最小可运行版本。
+1. 将 54 章的独立 MVP 纳入统一静态检查和示例索引；
+2. 把 Part VI 的业务案例与 `framework/` Runtime 形成更多纵向工程主线；
+3. 为关键章节补充架构图、评测数据集和可复现实验；
+4. 按季度复核 Part V 工具版本和 Part VII 趋势判断；
+5. 建立章节完成度、引用验证和代码运行状态清单。
