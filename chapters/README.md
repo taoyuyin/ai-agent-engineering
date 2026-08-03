@@ -75,6 +75,19 @@
 
 ## Part VI Enterprise Practice —— 企业实践
 
+本部分将前五部分的 Runtime、LLM、架构、工程治理和框架能力放入真实业务。八章不共享一个空泛 Agent 模板，而是分别实现企业交付中最关键的控制面。
+
+| Chapter | 业务能力 | MVP 验证重点 |
+| --- | --- | --- |
+| 42 SQL Agent | 结构化数据问答 | Semantic Metric、参数化 SQL、租户与 Evidence |
+| 43 Data Agent | 探索和诊断分析 | Data Quality Gate、统计异常与可复现解释 |
+| 44 BI Agent | KPI 与报表洞察 | Semantic Layer、RLS、Dashboard Spec |
+| 45 Coding Agent | 代码变更闭环 | Sandbox、Patch、Test、Rollback、Approval |
+| 46 Knowledge Agent | 企业制度问答 | ACL-first Retrieval、版本和 Citation |
+| 47 Customer Service | 客服与工单 | 身份、政策、Action Risk 与 Handoff |
+| 48 Manufacturing | 设备诊断 | OT 边界、遥测、风险和人工工单 |
+| 49 Multi-Agent Platform | 企业协作平台 | Registry、Scope、Budget、Hop 与 Trace |
+
 - [Chapter 42 SQL Agent](chapter42/README.md)
 - [Chapter 43 Data Agent](chapter43/README.md)
 - [Chapter 44 BI Agent](chapter44/README.md)
@@ -102,3 +115,5 @@
 4. `.env.example`：需要外部服务时提供环境变量模板
 
 平台型章节还应提供外部应用 Contract 和配置步骤，避免只保留无法复现的控制台截图。
+
+不依赖外部服务的离线 MVP 可以不提供 `.env.example`，但仍需用 `requirements.txt` 明确 Python 版本和依赖边界。

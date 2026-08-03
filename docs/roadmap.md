@@ -488,6 +488,24 @@ Part III 不重复 Part II 的底层原理，而是回答这些能力如何进�
 - 踩坑
 - 总结
 
+统一交付标准：
+
+- 每章从一个可验收的业务目标开始，而不是从框架 API 开始；
+- 明确 Identity、Data、Tool、Workflow、Human Approval 和 Evidence 边界；
+- 提供默认离线可运行的 Python MVP，先验证控制面，再替换为 LLM 节点；
+- 说明生产数据源、权限、部署、可观测和评测升级路径；
+- 对安全拒绝、空数据、冲突证据、工具失败和恢复路径进行设计；
+- 用业务指标、质量指标和系统指标共同验收。
+
+八章能力递进：
+
+```text
+SQL / Data / BI
+  -> Coding / Knowledge / Customer Service
+  -> Manufacturing High-risk Boundary
+  -> Multi-Agent Enterprise Platform
+```
+
 ### Chapter 42 SQL Agent
 
 面向结构化数据查询的 Agent。

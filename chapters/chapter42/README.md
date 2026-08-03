@@ -2,105 +2,172 @@
 
 Part VI Enterprise Practice —— 企业实践
 
-Version: 2026-07
+Version: 2026-08
 
-Last Updated: 2026-07-31
+Last Updated: 2026-08-03
 
-## Core Question
+## 本章结论
 
-本章要回答：`SQL Agent` 在 AI Agent Engineering 中到底解决什么问题？
+SQL Agent 的核心不是“自然语言生成 SQL”，而是把指标理解、Schema、数据权限、受限查询、结果解释和证据链组织成一条可审计的数据产品链路。
 
-## Chapter Conclusion
+生产系统中，LLM 只能生成候选查询意图或 SQL IR；只读账户、Semantic Layer、SQL AST、租户过滤、资源配额和数据库权限必须由确定性系统执行。
 
-SQL Agent 的核心不是生成 SQL，而是安全、可解释地完成结构化数据查询任务。
+## 学习目标
 
-## Learning Objectives
+- 区分 Text-to-SQL Demo 与企业 SQL Agent；
+- 设计自然语言到指标、维度、筛选条件的中间表示；
+- 理解 Scope、行列权限、只读账户和查询 Guardrail 的分层；
+- 返回 SQL、参数、指标版本和数据源组成的 Evidence；
+- 建立执行准确率、安全性、延迟与成本评测。
 
-完成本章后，你应该能够理解：
+## 42.1 业务背景
 
-- 意图理解
-- Schema
-- SQL 生成
-- 权限
-- 结果解释
+销售分析师提出“查询 2025 年各区域净销售额”。真实系统必须先回答：
 
-## 本章定位
+- “净销售额”是含税还是不含税，是否扣除退款？
+- 区域使用客户区域、门店区域还是销售组织？
+- 用户能访问哪些租户、区域和字段？
+- 查询是否会扫描整张明细表？
+- 数字如何追溯到指标版本、SQL 和数据快照？
 
-本章属于 `Part VI Enterprise Practice`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
+因此 SQL Agent 是 Semantic Layer 上的受治理查询入口，不是数据库超级用户。
 
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
+## 42.2 需求与验收标准
 
-## 主要内容
+功能要求：理解年份与区域；解析注册指标；生成参数化只读查询；返回聚合结果与证据。
 
-### 42.1 意图理解
+非功能要求：
 
-意图理解 是本章理解 `SQL Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
+- 默认拒绝无 Scope 请求；
+- 查询必须带 `tenant_id`；
+- 只允许白名单表、指标和维度；
+- 设置超时、扫描量、并发和结果行数上限；
+- SQL、参数、调用者、指标版本和结果摘要进入审计；
+- 同一问题在固定数据快照上结果可复现。
 
-在实际系统中，`意图理解` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
+## 42.3 参考架构
 
-### 42.2 Schema
-
-Schema 是本章理解 `SQL Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`Schema` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 42.3 SQL 生成
-
-SQL 生成 是本章理解 `SQL Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`SQL 生成` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 42.4 权限
-
-权限 是本章理解 `SQL Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`权限` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 42.5 结果解释
-
-结果解释 是本章理解 `SQL Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`结果解释` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-## Python 示例
-
-本章的 `example.py` 保留概念入口。完整工程实现见：
-
-```bash
-python -m pip install -r requirements.txt
-python -m pip install -e .
-python examples/sql-agent/main.py "查询 2025 年各区域净销售额" --show-trace
+```text
+API / Identity
+  -> Goal Parser
+  -> Schema + Semantic Retrieval
+  -> SQL IR Planner
+  -> Policy & SQL AST Validator
+  -> Read-only Query Service
+  -> Result Validator
+  -> Evidence-grounded Answer
+  -> Trace / Evaluation
 ```
 
-完整案例位于 [`examples/sql-agent/`](../../examples/sql-agent/README.md)，并复用根目录 [`framework/`](../../framework/README.md) Agent Runtime。它包含 Schema Tool、参数化 SQL、Scope、只读 Guardrail、Observation、Evidence、Trace、FastAPI、Docker Compose 和配套数据集。
+推荐先生成结构化 IR：
 
-确定性 Planner 使案例可以离线运行；后续本章将以同一验收数据集增加 Model Gateway、Semantic Layer、SQL AST、PostgreSQL 行列权限和 Text-to-SQL Evaluation。
+```json
+{
+  "metric": "net_revenue",
+  "dimensions": ["region"],
+  "filters": {"year": 2025},
+  "limit": 20
+}
+```
 
-## Engineering Notes
+再由可信编译器生成 SQL。这样可以在 SQL 出现前校验指标、维度、Join 和权限。
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+## 42.4 五层安全边界
+
+| 层 | 主要控制 |
+| --- | --- |
+| 身份层 | OIDC/JWT 派生 tenant、actor、scopes |
+| 语义层 | 指标、维度、Join 和敏感级别白名单 |
+| 查询层 | AST、单语句、只读、LIMIT、复杂度预算 |
+| 数据库层 | 独立只读角色、RLS、列权限、Statement Timeout |
+| 输出层 | PII 脱敏、聚合阈值、Evidence 与审计 |
+
+字符串黑名单只是教学第一层，不能替代 Parser 和数据库权限。PostgreSQL Row-Level Security 可以基于角色限制可见行；表 Owner 和具备 `BYPASSRLS` 的角色可能绕过策略，因此 Agent 查询角色必须单独设计。
+
+## 42.5 最小可运行 MVP
+
+本章 `example.py` 使用 SQLite 实现完整链路：
+
+1. 从问题提取年份和区域；
+2. 从 Semantic Registry 解析 `net_revenue`；
+3. 校验 `sales:read`；
+4. 自动加入 `tenant_id = ?`；
+5. 生成参数化聚合 SQL；
+6. 验证只读、表白名单和租户谓词；
+7. 返回指标定义、结果和 Evidence。
+
+```bash
+cd chapters/chapter42
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python example.py "查询 2025 年各区域净销售额"
+```
+
+示例数据包含另一个租户的高额订单，用于说明租户谓词必须在查询中执行，而不是生成答案后过滤。
+
+完整 Runtime、FastAPI、Docker 和测试工程见 [`examples/sql-agent/`](../../examples/sql-agent/README.md)。章节 MVP 用于看清控制链，完整案例用于学习服务化交付。
+
+## 42.6 接入 LLM 的正确位置
+
+LLM 适合：同义词理解、候选指标选择、歧义澄清、SQL IR 草拟、结果解释。
+
+LLM 不负责：认证、最终授权、SQL 执行许可、资源限额、证据真实性。
+
+当问题存在歧义时，Agent 应询问“区域指客户区域还是销售组织”，而不是静默选择。低置信度指标映射应停止执行。
+
+## 42.7 工具选型
+
+| 方案 | 优点 | 局限 | 适合阶段 |
+| --- | --- | --- | --- |
+| 手写规则 + SQLite | 离线、透明、易教学 | 领域有限 | MVP 与控制验证 |
+| SQL Parser/AST | 结构化校验强 | 方言适配成本 | 生产 Guardrail |
+| dbt/MetricFlow 类语义层 | 指标集中治理 | 需要数据建模体系 | 企业指标问答 |
+| 数据仓库原生权限 | 靠近数据、难绕过 | 多引擎策略不同 | 生产强制控制 |
+
+## 42.8 上线与评测
+
+上线顺序：Shadow Query → 只读内部用户 → 小范围分析师 → 扩展领域。不要从“能生成 SQL”直接跳到全公司开放。
+
+核心指标：
+
+- Intent/Metric/Filter Accuracy；
+- Execution Accuracy；
+- Answer Groundedness；
+- Unauthorized Access Rate，目标必须为 0；
+- P95 延迟、扫描字节、单查询成本；
+- 澄清率、空结果率和人工修正率。
+
+评测集必须包含越权、Prompt Injection、超大查询、错误指标、空数据和同名字段。
+
+## 42.9 常见踩坑
+
+- 把完整数据库 DDL 全塞入 Context，既贵又降低选表质量；
+- 让模型直接拼值而不是使用绑定参数；
+- 只在应用层过滤租户；
+- 指标没有 Owner 和版本；
+- 查询成功就算任务成功，忽略结果单位和证据；
+- 只测试正常问题，不测试恶意或昂贵查询。
+
+## 42.10 生产化清单
+
+- 认证信息只能由服务端构造；
+- 使用 SQL IR 和 AST Validator；
+- 数据库使用独立只读角色与 RLS；
+- Semantic Layer 版本化；
+- 设置超时、扫描量、并发与结果限制；
+- Trace 记录 SQL 模板与脱敏参数；
+- 敏感列禁止进入模型上下文；
+- 建立离线回归、在线抽检和回滚机制。
 
 ## Summary
 
-SQL Agent 的核心不是生成 SQL，而是安全、可解释地完成结构化数据查询任务。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
-
-## Notes
-
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+企业 SQL Agent 是受治理的数据查询 Runtime。MVP 展示了从指标解析、Scope、租户谓词、参数化 SQL 到 Evidence 的完整最小闭环；生产升级重点是语义层、AST、数据库原生权限和持续评测，而不是换一个更大的模型。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] PostgreSQL. Row Security Policies.
+https://www.postgresql.org/docs/current/ddl-rowsecurity.html
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
-
-以上 URL 已在 2026-07-31 验证可访问。
+[2] OWASP. GenAI Security Project.
+https://genai.owasp.org/

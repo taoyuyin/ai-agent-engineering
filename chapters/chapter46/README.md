@@ -2,101 +2,149 @@
 
 Part VI Enterprise Practice —— 企业实践
 
-Version: 2026-07
+Version: 2026-08
 
-Last Updated: 2026-07-31
+Last Updated: 2026-08-03
 
-## Core Question
+## 本章结论
 
-本章要回答：`Enterprise Knowledge Agent` 在 AI Agent Engineering 中到底解决什么问题？
+Enterprise Knowledge Agent 的核心不是“上传文档后聊天”，而是建立知识摄取、版本、ACL、检索、引用、反馈和淘汰的完整生命周期。权限过滤必须发生在检索前，答案必须能回到有效版本的原始证据。
 
-## Chapter Conclusion
+## 学习目标
 
-Enterprise Knowledge Agent 面向企业知识、制度、流程和文档问答。
+- 设计 Document、Chunk、Metadata、ACL 和 Version Contract；
+- 理解关键词、向量、混合检索和 Rerank 的取舍；
+- 在检索前执行租户与用户组权限；
+- 输出可验证引用并处理冲突、过期和无答案；
+- 建立知识质量与回答质量双层评测。
 
-## Learning Objectives
+## 46.1 业务背景
 
-完成本章后，你应该能够理解：
+员工问“住宿费超过 800 元如何报销”。企业知识系统必须识别当前生效制度，排除旧版本，并确保提问者有权访问。只要其中一步失败，语言再流畅也可能造成合规事故。
 
-- 知识库
-- 权限
-- 引用
-- 流程
-- 更新
+知识 Agent 的事实源是受治理 Document，不是模型参数记忆。
 
-## 本章定位
+## 46.2 知识生命周期
 
-本章属于 `Part VI Enterprise Practice`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
-
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
-
-## 主要内容
-
-### 46.1 知识库
-
-知识库 是本章理解 `Enterprise Knowledge Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`知识库` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 46.2 权限
-
-权限 是本章理解 `Enterprise Knowledge Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`权限` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 46.3 引用
-
-引用 是本章理解 `Enterprise Knowledge Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`引用` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 46.4 流程
-
-流程 是本章理解 `Enterprise Knowledge Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`流程` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 46.5 更新
-
-更新 是本章理解 `Enterprise Knowledge Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`更新` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-## Python 示例
-
-本章配套示例见：
-
-```bash
-python chapters/chapter46/example.py
+```text
+Source Registration
+  -> Parse / Normalize
+  -> Classify / ACL
+  -> Chunk / Metadata
+  -> Index
+  -> Retrieve / Rerank
+  -> Answer / Citation
+  -> Feedback / Evaluation
+  -> Update / Supersede / Delete
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+每个文档至少保存：`doc_id`、Owner、版本、生效/失效时间、状态、ACL、来源 URI、内容 Hash、解析器版本和索引时间。
 
-## Engineering Notes
+## 46.3 检索架构
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+| 方案 | 优点 | 局限 |
+| --- | --- | --- |
+| Keyword/BM25 | 精确词、编号和专有名词稳定 | 语义改写召回弱 |
+| Vector | 语义相似能力强 | 数字、否定和专名可能失真 |
+| Hybrid | 兼顾精确与语义 | 需要权重与归一化 |
+| Reranker | 提升 Top-N 排序 | 增加延迟和成本 |
+
+企业默认可以从 Hybrid + Metadata Filter 开始，再用真实问题评测，不应仅凭向量库品牌决定质量。
+
+## 46.4 ACL 必须早于检索
+
+正确顺序：
+
+```text
+Identity -> Tenant/Group ACL Filter -> Candidate Retrieval -> Rerank -> Context
+```
+
+错误做法是先全库召回，再让模型“不要引用无权内容”。此时敏感内容已经进入 Context。Vector Store、Search API 或知识服务必须支持可强制执行的 Metadata Filter；高敏领域可以使用物理分库。
+
+## 46.5 最小可运行 MVP
+
+`example.py` 实现一个零依赖知识 Agent：
+
+- 文档包含版本、生效日期、状态和 ACL；
+- 先过滤用户组和 `active` 状态；
+- 对中英文文本生成关键词/CJK bigram；
+- 计算轻量相关度并排序；
+- 返回答案、版本化 Citation 和检索策略；
+- 无证据时明确回答 `not_found`。
+
+```bash
+cd chapters/chapter46
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python example.py "住宿费超过 800 元如何报销？"
+```
+
+数据集中同时存在旧版制度和仅财务可见文档。普通员工只能召回当前有效、授权范围内的差旅制度。
+
+## 46.6 Chunk 与 Context
+
+Chunk 不应只按固定字符数切分。制度适合按条款、标题层级和表格语义切分；代码适合按 Symbol；工单适合按问题—处理—结果。
+
+Chunk Metadata 应继承文档 ACL 和版本。Context Assembly 保留标题、章节、版本、日期和来源，不能只传裸文本。超长文档先检索局部证据，必要时使用层级摘要。
+
+## 46.7 引用与冲突处理
+
+引用质量要检查两件事：引用文档是否相关，以及引用片段是否真正支持结论。Agent 遇到以下情况应停止或升级：
+
+- 两份同级有效制度相互冲突；
+- 只有过期文档；
+- 证据低于置信阈值；
+- 问题要求个人法律/财务决定；
+- 引用缺少 Owner 或版本。
+
+模型不能静默合并冲突制度。
+
+## 46.8 更新、删除与缓存
+
+发布新版本后，旧 Chunk 必须下线或标记 superseded；删除源文档要传播到索引、缓存和备份策略。缓存键包含 ACL、文档版本和问题，权限变化时主动失效。
+
+知识新鲜度 SLA 与业务风险匹配：产品手册可以每日同步，紧急安全公告需要分钟级传播。
+
+## 46.9 评测与上线
+
+分层评测：
+
+- Retrieval：Recall@K、MRR、ACL 泄露率、新鲜度；
+- Answer：事实正确、引用支持、完整性、拒答准确率；
+- Operation：P95 延迟、索引延迟、失败率和成本；
+- Business：自助解决率、人工转接率、制度误用事件。
+
+测试集包含同义问题、旧制度、冲突制度、无权限问题、无答案和 Prompt Injection 文档。
+
+## 46.10 常见踩坑
+
+- ACL 只保存在前端；
+- 新版本上线但旧 Chunk 仍被召回；
+- 只评测答案，不评测 Retrieval；
+- Citation 只指向文档首页；
+- 用户反馈直接修改知识，无 Owner 审批；
+- 把文档内容当作可信指令执行。
+
+## 46.11 生产化清单
+
+- Source、Owner、版本和生命周期；
+- ACL-before-retrieval；
+- 领域化 Chunk 与 Metadata；
+- Hybrid/Rerank 基于评测选型；
+- 引用支持性验证；
+- 冲突、过期和无答案策略；
+- 删除传播与缓存失效；
+- 检索、回答和业务指标监控。
 
 ## Summary
 
-Enterprise Knowledge Agent 面向企业知识、制度、流程和文档问答。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
-
-## Notes
-
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+企业知识 Agent 是 Knowledge Engineering、RAG、权限和生命周期的组合。MVP 用旧版本和受限文档证明：先决定什么证据可见，再讨论模型如何回答。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] NIST. AI Risk Management Framework.
+https://airc.nist.gov/airmf-resources/airmf/
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
-
-以上 URL 已在 2026-07-31 验证可访问。
+[2] OWASP. GenAI Security Project.
+https://genai.owasp.org/

@@ -2,101 +2,136 @@
 
 Part VI Enterprise Practice —— 企业实践
 
-Version: 2026-07
+Version: 2026-08
 
-Last Updated: 2026-07-31
+Last Updated: 2026-08-03
 
-## Core Question
+## 本章结论
 
-本章要回答：`Manufacturing Agent` 在 AI Agent Engineering 中到底解决什么问题？
+Manufacturing Agent 应优先作为 OT 系统之上的诊断和决策支持层，而不是直接闭环控制 PLC。生产安全、实时控制、联锁和停机逻辑仍属于确定性 OT 系统；Agent 负责跨数据源收集证据、解释异常、提出工单并等待授权。
 
-## Chapter Conclusion
+## 学习目标
 
-Manufacturing Agent 连接生产、质量、设备、供应链和数据平台。
+- 理解 ISA-95 式企业层、MES/SCADA/PLC 边界；
+- 组合时序数据、设备主数据、维修知识和工单；
+- 设计诊断、风险分级与人工审批状态机；
+- 处理 IT/OT 网络隔离、可用性和安全要求；
+- 评估误报、漏报、提前量和维护业务价值。
 
-## Learning Objectives
+## 48.1 业务背景
 
-完成本章后，你应该能够理解：
+电机轴承温度和振动持续升高。Agent 需要读取授权工厂的遥测、校验传感器质量、比较设备型号阈值、查找维修手册并提出维护建议。
 
-- 制造业
-- 质量
-- 设备
-- 供应链
-- 数据平台
+错误停机可能造成产能损失，漏报可能造成设备和人员风险。制造场景的风险边界明显高于普通知识问答。
 
-## 本章定位
+## 48.2 分层架构
 
-本章属于 `Part VI Enterprise Practice`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
-
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
-
-## 主要内容
-
-### 48.1 制造业
-
-制造业 是本章理解 `Manufacturing Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`制造业` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 48.2 质量
-
-质量 是本章理解 `Manufacturing Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`质量` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 48.3 设备
-
-设备 是本章理解 `Manufacturing Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`设备` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 48.4 供应链
-
-供应链 是本章理解 `Manufacturing Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`供应链` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 48.5 数据平台
-
-数据平台 是本章理解 `Manufacturing Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`数据平台` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-## Python 示例
-
-本章配套示例见：
-
-```bash
-python chapters/chapter48/example.py
+```text
+ERP / EAM / Data Platform
+          |
+Manufacturing Agent Service
+  -> Asset Registry / Historian Read API
+  -> Knowledge / Maintenance History
+  -> Diagnostic & Risk Engine
+  -> Work-order Proposal
+  -> Human Approval
+          |
+MES / SCADA Gateway
+          |
+PLC / Safety Instrumented System
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+Agent 默认通过只读 Historian/Data API 获取遥测，不从云端直接访问 PLC。安全联锁不依赖 LLM 或外部网络。
 
-## Engineering Notes
+## 48.3 数据 Contract
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+设备数据需要：Asset ID、Plant、Model、测点、单位、采样时间、质量码、校准信息和数据来源。没有单位或质量码的传感器数值不应进入诊断。
+
+知识数据需要匹配设备型号、手册版本和工厂差异。维修工单提供历史故障模式，但不能自动证明当前根因。
+
+## 48.4 最小可运行 MVP
+
+`example.py` 实现：
+
+- 工厂和 `telemetry:read` 权限；
+- 温度、振动与 RPM 时间序列；
+- 版本化安全阈值；
+- 最新值、近期均值和趋势检查；
+- 严重度分级；
+- 维护工单 Proposal；
+- Lockout/Tagout 标记和主管审批；
+- 明确 `automatic_control_command_sent=false`。
+
+```bash
+cd chapters/chapter48
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python example.py motor-7
+```
+
+示例同时触发温度与振动阈值，因此状态是 `awaiting_human_approval`，不会自动停机或重启设备。
+
+## 48.5 规则、ML 与 LLM 的分工
+
+| 能力 | 推荐技术 |
+| --- | --- |
+| 实时联锁/停机 | PLC/SIS 确定性逻辑 |
+| 阈值与组合规则 | Rule Engine |
+| 异常检测/剩余寿命 | 经验证的时序 ML |
+| 手册检索与解释 | RAG/LLM |
+| 跨系统任务协调 | Agent/Workflow |
+| 最终高风险决定 | 授权工程师 |
+
+LLM 不应把自然语言建议直接翻译为控制指令。
+
+## 48.6 IT/OT 安全
+
+NIST SP 800-82 强调 OT 的性能、可靠性和安全要求。Agent 部署要遵循分区分域、最小通信、跳板/API Gateway、只读数据复制、资产清单和变更管理。
+
+模型服务不可用时，设备安全逻辑仍要独立运行。Agent 是增强层，不是安全关键依赖。
+
+## 48.7 Human-in-the-loop
+
+审批包包含：设备、测点趋势、阈值版本、相似历史、建议动作、风险和 Trace。审批人可以批准、拒绝或要求更多证据。
+
+执行维修后，将实际根因、处理动作和结果写回 EAM，经审核后用于评测和知识更新，不能让 Agent 自动把自己的推测写成事实。
+
+## 48.8 评测与上线
+
+指标包括：Precision/Recall、平均提前量、误停机建议率、漏报率、MTTR、非计划停机时间、工单接受率和安全事件。
+
+上线顺序：历史回放 → Shadow Mode → 只生成诊断 → 创建工单草稿 → 受审批执行。跨季节、负载、设备型号和传感器故障做分层评测。
+
+## 48.9 常见踩坑
+
+- 忽略单位、时区和传感器质量码；
+- 用统一阈值覆盖所有型号；
+- 让 Agent 直接连接 PLC；
+- 把相关异常当作故障根因；
+- 云服务失败影响现场安全逻辑；
+- 维修结果未经审核就写入长期知识；
+- 只优化模型准确率，不衡量停机业务影响。
+
+## 48.10 生产化清单
+
+- Asset/Signal/Unit Contract；
+- OT 网络分区与只读 Gateway；
+- 规则、ML、LLM 职责分离；
+- 安全关键动作人工审批；
+- 阈值、模型和手册版本化；
+- Historian、EAM、MES Evidence 可关联；
+- 离线回放和 Shadow Mode；
+- 断网、降级、回滚与应急演练。
 
 ## Summary
 
-Manufacturing Agent 连接生产、质量、设备、供应链和数据平台。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
-
-## Notes
-
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+制造业 Agent 的价值是缩短异常到维护决策的链路，同时尊重 OT 的安全和实时边界。MVP 只生成可审计工单提案，清晰展示了“Agent 建议、确定性系统保护、人负责批准”。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] NIST. SP 800-82 Rev. 3, Guide to Operational Technology Security.
+https://csrc.nist.gov/pubs/sp/800/82/r3/final
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
-
-以上 URL 已在 2026-07-31 验证可访问。
+[2] NIST. AI Risk Management Framework.
+https://airc.nist.gov/airmf-resources/airmf/

@@ -103,6 +103,8 @@ ai-agent-engineering/
 
 ### Part VI Enterprise Practice —— 企业实践
 
+通过 SQL、数据分析、BI、Coding、企业知识、客服、制造和 Multi-Agent 平台八个案例，把 Agent Runtime、权限、质量、证据、审批、评测和上线流程组合起来。各章提供不依赖模型密钥的离线 MVP，先验证控制面，再接入 LLM。
+
 - [Chapter 42 SQL Agent](chapters/chapter42/README.md)
 - [Chapter 43 Data Agent](chapters/chapter43/README.md)
 - [Chapter 44 BI Agent](chapters/chapter44/README.md)
@@ -158,6 +160,16 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python example.py
+```
+
+运行企业实践中的离线 MVP：
+
+```bash
+cd chapters/chapter46
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python example.py "住宿费超过 800 元如何报销？"
 ```
 
 ## 核心路线

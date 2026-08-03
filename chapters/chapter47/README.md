@@ -2,101 +2,144 @@
 
 Part VI Enterprise Practice —— 企业实践
 
-Version: 2026-07
+Version: 2026-08
 
-Last Updated: 2026-07-31
+Last Updated: 2026-08-03
 
-## Core Question
+## 本章结论
 
-本章要回答：`Customer Service Agent` 在 AI Agent Engineering 中到底解决什么问题？
+Customer Service Agent 是“知识回答 + 客户数据工具 + 业务流程 + 人工升级”的组合。它不应以对话结束作为成功，而应以问题是否安全解决、动作是否正确、客户是否得到连续服务作为验收标准。
 
-## Chapter Conclusion
+## 学习目标
 
-Customer Service Agent 需要在知识检索、工单流程和用户体验之间取得平衡。
+- 设计意图、身份、知识、订单和工单协作链；
+- 区分回答型 Tool 与有副作用的 Action Tool；
+- 建立自动处理阈值与 Human Handoff；
+- 维护会话摘要、证据和工单连续性；
+- 评估解决率、转人工准确率、政策合规和客户体验。
 
-## Learning Objectives
+## 47.1 业务背景
 
-完成本章后，你应该能够理解：
+客户问“订单 A-1001 可以退款吗”。Agent 必须认证客户、校验订单归属、检索当前退款制度、计算时限与金额边界，并决定自动创建审核还是升级人工。
 
-- 客服
-- 工单
-- 知识检索
-- 升级
-- 质检
+仅回答一段退款政策并没有完成任务；未验证归属就暴露订单信息则构成安全问题。
 
-## 本章定位
+## 47.2 参考架构
 
-本章属于 `Part VI Enterprise Practice`。它承接前面章节建立的世界观，并为后续 Agent Runtime、框架分析或企业实践提供一个可复用的工程抽象。
-
-本书不是按框架 API 来组织内容，而是先建立概念，再实现最小 Python 示例，最后再对照成熟框架和企业系统。这样做的目的，是让读者理解设计思想，而不是只记住某个库的调用方式。
-
-## 主要内容
-
-### 47.1 客服
-
-客服 是本章理解 `Customer Service Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`客服` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 47.2 工单
-
-工单 是本章理解 `Customer Service Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`工单` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 47.3 知识检索
-
-知识检索 是本章理解 `Customer Service Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`知识检索` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 47.4 升级
-
-升级 是本章理解 `Customer Service Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`升级` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-### 47.5 质检
-
-质检 是本章理解 `Customer Service Agent` 的关键入口。这里关注的不是术语本身，而是它在 Agent 工程中的位置：它解决什么复杂度、影响哪个运行时组件、会带来哪些工程约束。
-
-在实际系统中，`质检` 不应该被孤立看待。它通常会和目标理解、工具调用、上下文管理、评测、安全边界或企业系统集成发生关系。后续源码会把这个概念逐步落到 Python 示例和 `framework/` 运行时实现中。
-
-## Python 示例
-
-本章配套示例见：
-
-```bash
-python chapters/chapter47/example.py
+```text
+Channel Gateway
+  -> Authentication / Session
+  -> Intent & Risk Classifier
+  -> Knowledge Retrieval
+  -> Customer/Order Tools
+  -> Policy Decision
+  -> Action Workflow
+  -> Response + Citation
+  -> Human Handoff / QA
 ```
 
-这个示例不是最终生产代码，而是一个最小工程草图。后续章节会逐步把这些草图合并进统一的 `framework/` Agent Runtime。
+Channel Gateway 统一 Web、App、邮件和电话转写；CRM/OMS/工单系统通过受治理 Tool 暴露，不直接把后台凭证交给模型。
 
-## Engineering Notes
+## 47.3 Tool 分级
 
-- 先用最小可运行代码验证概念，再引入框架。
-- 所有抽象都应该能回答：输入是什么、输出是什么、状态在哪里、失败怎么处理。
-- 如果一个概念不能被观测、测试或复现，就还没有进入工程化阶段。
-- 企业级 Agent 必须同时考虑权限、成本、延迟、评测和可观测性。
+| 类型 | 示例 | 控制 |
+| --- | --- | --- |
+| Public Read | 查询公开政策 | 引用与版本 |
+| Private Read | 查询本人订单 | 认证、对象归属、脱敏 |
+| Reversible Write | 创建/补充工单 | 幂等、审计、限频 |
+| Financial Action | 退款、补偿 | 金额阈值、审批、反欺诈 |
+| Irreversible Action | 关闭账号、法律承诺 | 默认人工处理 |
+
+Agent 可以提出 Action Proposal，Workflow 决定是否执行。
+
+## 47.4 最小可运行 MVP
+
+本章示例完成：
+
+- 根据问题检索版本化退款政策；
+- 校验客户认证与订单归属；
+- 计算签收天数和金额；
+- 低风险订单创建自动退款审核；
+- 超过边界时创建高优先级人工工单；
+- 返回决定、动作、政策引用和质检字段。
+
+```bash
+cd chapters/chapter47
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python example.py "订单 A-1001 可以退款吗？"
+```
+
+示例把“自动退款”拆成“创建待库存确认的审核”，避免模型直接完成资金动作。
+
+## 47.5 会话与工单连续性
+
+转人工时传递结构化 Handoff Package：客户身份、已验证订单、用户目标、已执行工具、引用政策、失败原因、建议下一步和 Trace ID。人工坐席不应要求客户重新陈述全部信息。
+
+长期记忆只保存经批准的客户偏好和摘要；支付、身份和敏感字段保留在源系统，通过 ID 引用。
+
+## 47.6 Human Handoff 触发条件
+
+- 身份或订单归属无法验证；
+- 高金额、欺诈风险或法律风险；
+- 政策冲突或无证据；
+- 客户明确要求人工；
+- 连续两次工具/理解失败；
+- 情绪升级、自伤或安全事件；
+- 需要系统没有授权的动作。
+
+升级不是失败，而是风险控制成功。
+
+## 47.7 Guardrail 与 Prompt Injection
+
+客户输入、邮件附件和知识文档都可能包含恶意指令。模型输出不能直接成为 API 参数；Action Tool 使用固定 Schema、服务器端身份和业务校验。
+
+隐私输出按最小披露原则，日志中对电话、地址、订单和聊天内容进行脱敏与保留周期管理。
+
+## 47.8 评测与上线
+
+核心指标：
+
+- Intent Accuracy；
+- Grounded Answer Rate；
+- Safe Resolution Rate；
+- Handoff Precision/Recall；
+- Unauthorized Data Exposure，目标 0；
+- First Contact Resolution、AHT、CSAT；
+- 错误动作率、重复工单率和人工返工率。
+
+先做 Agent Assist：向坐席建议答案；再开放低风险自助；资金和不可逆动作最后开放，并保留审批。
+
+## 47.9 常见踩坑
+
+- 把 FAQ Bot 当完整客服 Agent；
+- 未认证就查询订单；
+- 用 Prompt 决定退款权限；
+- 转人工只传一段聊天记录；
+- 追求转人工率越低越好；
+- 客户输入直接进入 Tool 参数；
+- 只评估语言满意度，不评估动作正确性。
+
+## 47.10 生产化清单
+
+- 统一身份与对象归属验证；
+- Tool 权限和动作风险分级；
+- 政策版本与引用；
+- 幂等工单和资金流程；
+- 结构化 Handoff；
+- 隐私、脱敏和留存；
+- 离线场景回归与在线质检；
+- Kill Switch、回滚和人工兜底。
 
 ## Summary
 
-Customer Service Agent 需要在知识检索、工单流程和用户体验之间取得平衡。
-
-本章为后续章节提供了一个局部抽象。等到 Part III 和 Part IV，这些抽象会被组合成完整 Agent Architecture 和 Production Ready 工程体系。
-
-## Notes
-
-本章是章节草稿的第一版，重点是建立结构和工程边界。后续在正式文章发布前，应继续补充案例、图示、代码演进和引用验证。
+客服 Agent 的完成条件是安全解决业务问题，而非输出一段自然语言。MVP 展示了身份、订单、政策、确定性决策、低风险动作和人工升级的完整闭环。
 
 ## References
 
-[1] OpenAI.  
-A Practical Guide to Building Agents.  
-https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
+[1] NIST. AI Risk Management Framework.
+https://airc.nist.gov/airmf-resources/airmf/
 
-[2] Anthropic.  
-Building Effective Agents.  
-https://www.anthropic.com/engineering/building-effective-agents
-
-以上 URL 已在 2026-07-31 验证可访问。
+[2] OWASP. GenAI Security Project.
+https://genai.owasp.org/
